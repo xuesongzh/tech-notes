@@ -1,6 +1,6 @@
 tcpdump 和 Wireshark 是网络问题定位中的神器，尽管它们已经被使用了多年，许多人仍然不了解它们是如何实现抓包的。这篇文章将介绍 tcpdump 背后的底层实现，并展示如何模拟 tcpdump 的部分格式来抓取 8080 端口的包。最终效果如下
 
-```
+```powershell
 192.168.1.2.59043 > 192.168.1.4.8080 Flags [S], seq 2188010653, ack 0, win 65535, length 0
 192.168.1.4.8080 > 192.168.1.2.59043 Flags [S.], seq 500839884, ack 2188010654, win 65160, length 0
 192.168.1.2.59043 > 192.168.1.4.8080 Flags [.], seq 2188010654, ack 500839885, win 2058, length 0
@@ -15,9 +15,11 @@ tcpdump 和 Wireshark 是网络问题定位中的神器，尽管它们已经被�
 
 我们来看创建套接字的 `socket` 系统调用的函数签名：
 
-    #include <sys/socket.h>
+```c
+#include <sys/socket.h>
 
-    int socket(int domain, int type, int protocol);
+int socket(int domain, int type, int protocol);
+```
 
 其中第二个参数 `type` 表示了 socket 的类型，我们最常使用的套接字类型是
 
@@ -34,8 +36,10 @@ tcpdump 和 Wireshark 是网络问题定位中的神器，尽管它们已经被�
 
 创建完 Raw Socket，接下来就是对这个 socket 进行读写。Raw Socket 可以认为是无连接的，因为它的编程方式和 UDP 差不多，`recvfrom`和 `sendto`系统调用在一个原始 Raw Socket 上接收和发送数据报。抓包的场景是从 Raw Socket 读取数据，我们来重点看一下 recvfrom 函数。
 
-    ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
-                     struct sockaddr *src_addr, socklen_t *addrlen);
+```c
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
+                 struct sockaddr *src_addr, socklen_t *addrlen);
+```
 
 其中 buf 用来指定读取的数据缓冲区，len 表示缓冲区的长度，src\_addr 用来获取对端地址，如果不关心可以设置为 NULL，addrlen 表示 src\_addr 结构体的长度。
 
@@ -163,20 +167,24 @@ int main() {
 
 其中有一个值得注意的是 `tcp_header_length` 的计算方式：
 
-    u_char tcp_header_length = (tcp_header->th_offset >> 4) * 4;
+```c
+u_char tcp_header_length = (tcp_header->th_offset >> 4) * 4;
+```
 
 这是因为 TCP 头中的 data offset 的值在高四位，以 32-bit words 的形式来指定头部的长度。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/40358c0a7dc64bf18e961c662c11f732~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1666\&h=710\&s=201175\&e=jpg\&b=f3f5f7)
+![](image/tcp.png)
 
 我们来编译运行一下上面的代码：
 
-    $ g++ minidump.cpp -o minidump
-    $ sudo ./minidump
+```powershell
+$ g++ minidump.cpp -o minidump
+$ sudo ./minidump
+```
 
 接下来启动一个 tcp server，监听 8080 端口，这里启动一个静态文件服务器，使用 curl 访问一下，就可以在 minidump 的输出中看到握手、发送数据和挥手的过程了。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/92589dc2b7a747beb35ce01f0cdcf517~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=2340\&h=1472\&s=918158\&e=jpg\&b=1e1f23)
+![](image/tcp2.png)
 
 ## 内核层面是如何处理的
 

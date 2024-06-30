@@ -6,7 +6,7 @@
 
 Linux 内存管理有三个层面：第一层是我们的用户管理层，比如我们自己程序的内存池，mysql 的 bufferpool；第二层是 C 的运行时库，这部分代码是对内核的一个包装，方便上层应用更方便地开发；再下一层就是我们的内核层了。
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5d41ea476147481cbe0c159687920d2c~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="70%"/></p>
+![](image/memory12.png)
 
 我们今天要重点介绍的就是中间那一层，这一层是由一个 libc 的库来实现的，接下来详细看看看 libc 内存管理是如何做的。
 
@@ -15,7 +15,7 @@ Linux 内存管理的核心思想就是分层管理、批发零售、隐藏内�
 
 我们先来看内存申请释放的两个函数，malloc 和 free，这两个函数的定义如下：
 
-```
+```c
 #include <stdlib.h>
 
 void *malloc(size_t size);
@@ -30,13 +30,13 @@ void free(void *ptr);
 
 内存的申请和释放特别频繁，如果每次都去执行系统调用，开销会很大。所以内存分配器想到的第一个解决办法是缓存，申请内存时，向操作系统多批发一点，慢慢零售给用户进程，释放时暂时不归还给操作系统，在内部标记为空闲即可，libc 就是一个内存的二道贩子。
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/fb480da9345a42dd8481723887e6d463~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="80%"/></p>
+![](image/memory13.png)
 
 实现内存分配器还有一个原因是为了编程上的统一，比如有些时候用 brk，有些时候用 mmap，不太友好，brk 在多线程下还需要进行加锁，用一个 malloc 就很香。
 
 对于上层应用而言，主要是跟内存分配器打交道，Linux 默认的内存分配器是 ptmalloc2，是 glibc 中一个模块。比较出名的还有下面这几个：
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/97d64b854eab4ffca82079ae486ebed3~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="80%"/></p>
+![](image/memory14.png)
 
 - dlmalloc：dlmalloc 是 Doug Lea 实现的，名字中的 dl 是作者的名字缩写。
 - ptmalloc2：是 dlmalloc 的一个扩展版本，支持多线程。
@@ -56,28 +56,28 @@ void free(void *ptr);
 
 先来看 Arena，Arena 的中文翻译的意思是主战场、舞台，对应在内存分配这里，指的是内存分配的主战场。
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/9b059bff8e6d4b07921245c7b8186618~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="70%"/></p>
+![](image/memory15.png)
 
 Arena 的出现首先用来解决多线程下全局锁的问题，它的思路是尽可能地让一个线程独占一个 Arena，同时一个线程会申请一个或多个堆，释放的内存又会进入回收站，Arena 就是用来管理这些堆和回收站的。
 
 Arena 的数据结构长啥样？它是一个结构体，可以用下面的图来表示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/9bbf01e6a7a245cb934dc150845354b8~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory16.png)
 
 
 它是一个单向循环链表，使用 mutex 锁来处理多线程竞争，释放的小块内存会放在 bins 的结构中。
 
 前面提到，Arena 会尽量让一个线程独占一个锁，那如果我有几千个线程，会生成几千个 Arena 吗？显然是不会的，所有跟线程有关的瓶颈问题，最后都会走到 CPU 核数的限制这里来，分配区的个数也是有上限的，64 位系统下，分配区的个数大小是 cpu 核数的八倍，多个 Arena 组成单向循环链表。
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/afe96a0d885b4b64b7c019a20fa97da7~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="70%"/></p>
+![](image/memory17.png)
 
 我们可以写个代码来打印 Arena 的信息。它的原理是对于一个确定的程序，main_arena 的地址是一个位于 glibc 库的确定的地址，我们在 gdb 调试工具中可以打印这个地址。也可以使用 ptype 命令来查看这个地址对应的结构信息，如下图所示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/fdbf281878fc4ffc82ab1c9b69d6bfa1~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory18.png)
 
 有了这个基础，我们就可以写一个 do while 来遍历这个循环链表了。我们把 main_arena 的地址转为 malloc_state 的指针，然后 do while 遍历，直到遍历到链表头。
 ​
-```
+```c
 struct malloc_state {
     int mutex;
     int flags;
@@ -111,10 +111,10 @@ int main() {
     return 0;
 }
 ```
-​
+
 输出结果如下：
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/e2cdb89c072047dc93722f8634717d1b~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="60%"/></p>
+![](image/memory19.png)
 
 #### 主分配区与非主分配区
 
@@ -124,13 +124,13 @@ int main() {
 
 从某种意义上来讲，Heap 区不过是 DATA 段的扩展而已，主分配区内存分配的示意图如下：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/4225714ddf3d40b6b78d1cb26228fdde~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory20.png)
 
 非主分配区呢？它更像是一个分封在外地，自主创业的王爷，它想要内存时就使用 mmap 批发大块内存（64M）作为子堆（Sub Heap），然后再慢慢零售给上层应用。
 
 一个 64M 用完，再开辟一个新的，多个子堆之间也是使用链表相连，一个 Arena 可以有多个子堆。在接下的内容中，我们还会继续详细介绍。
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7d007e270adb45928baf76d012e40bb5~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="80%"/></p>
+![](image/memory21.png)
 
 ### 大块连续内存集散地 Heap
 
@@ -140,21 +140,21 @@ int main() {
 
 那如何理解切割零售这句话呢？它的实现也非常简单，先申请一块 64M 大小的不可读不可写不可执行（PROT_NONE）的内存区域，需要内存时使用 mprotect 把一块内存区域的权限改为可读可写（R+W）即可，这块内存区域就可以分配给上层应用了。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/6704de13e06d46b49b70f68929e3fc06~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory22.png)
 
 以我们前面 java 进程的内存布局为例：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/d3bf1de0790b4eb79af33ea88ff1b4fe~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory23.png)
 
 这中间的两块内存区域是属于一个子堆，它们加起来的大小是 64M，然后其中有一块 1.3M 大小的内存区域就是使用 mprotrect 分配出去的，剩下的 63M 左右的区域，是不可读不可写不可执行的待分配区域。
 
 知道这个有什么用呢？太有用了，你在 google 里所有 Java 堆外内存等问题，有很大可能性会搜到 Linux 神奇的 64M 内存问题。有了这里的知识，你就比较清楚到底这 64M 内存问题是什么了。
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5b3cbae4a35f4fb7934b65a2caf1a9ca~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="70%"/></p>
+![](image/memory24.png)
 
 与前面的 Arena 一样，我们同样可以在代码中，遍历所有 Arena 的所有的 heap 列表，代码如下所示：
 
-```
+```c
 struct heap_info {
     struct malloc_state *ar_ptr;
     struct heap_info *prev;
@@ -196,7 +196,7 @@ dump_non_main_subheaps((void*)MAIN_ARENA_ADDR);
 
 这里我们挑选第一种 chunk 来做详细的介绍。接下来我们来做一个实验，看看 malloc 分配的内存区块的大小情况，代码如下：
 
-```
+```c
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -220,7 +220,7 @@ int main(void) {
 
 这段代码分配了三次 1k 大小的内存，内存地址是：
 
-```
+```powershell
 ./malloc_test
                                                                               
 0x602010
@@ -230,7 +230,7 @@ int main(void) {
 
 pmap 输出的结果如下所示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/fffe8acfcb7f4092925d6483d5da6880~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory25.png)
 
 可以看到第一次分配的内存区域地址 0x602010 在这块内存区域的基址(0x602000)偏移量 16(0x10) 的地方。
 
@@ -242,7 +242,7 @@ pmap 输出的结果如下所示：
 
 再来回看 malloc 和 free，那我们不禁问自己一个问题，free 函数的参数只有一个指针，它是怎么知道要释放多少内存的呢？
 
-```
+```c
 #include <stdlib.h>
 
 void *malloc(size_t size);
@@ -253,17 +253,17 @@ void free(void *ptr);
 
 香港作家张小娴说过，「凡事皆有代价，快乐的代价便是痛苦」。为了存储 1k 的数据，实际上还需要一些数据来记录这块内存的元数据。这块额外的数据被称为 chunk header，长度为 16 字节。这就是我们前面看到的多出来 0x10 字节。
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/a86a1e65e9c048c59dc973b3dfaf3716~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="80%"/></p>
+![](image/memory26.png)
 
 这种通过在实际数据前面添加 head 方式使用的非常普遍，比如 java 中 new Integer(1024)，实际存储的数据大小远不止 4 字节，它有一个巨大无比的对象头，里面存储了对象的 hashcode，经过了几次 GC，有没有被当做锁同步。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/b7d4e5cb54d541f4adca9c45e668be76~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory27.png)
 
 害，说 java 臃肿并不是没有道理。
 
 我们继续来看这个 16 字节的 header 里面到底存储了什么，它的结构示意图如下所示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/96752cbb581345319374992927648556~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory28.png)
 
 它分为两部分，前 8 字节表示前一个 chunk 块的大小，接下来的 8 字节表示当前 chunk 块的大小。
 
@@ -276,7 +276,7 @@ void free(void *ptr);
 
 从 glibc 源码中可以看得更清楚一些：
 
-```
+```c
 #define PREV_INUSE 0x1
 /* extract inuse bit of previous chunk */
 #define prev_inuse(p)       ((p)->size & PREV_INUSE)
@@ -296,7 +296,7 @@ void free(void *ptr);
 
 可以使用 gdb 查看这三个内存地址往前 0x10 字节开始的 32 字节区域。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1557a3cee1a4482ba9825315f6928051~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory29.png)
 
 可以看到实际上存储的是 0x0411（1041），为什么是 0x0411 呢？
 
@@ -313,7 +313,7 @@ size 的最低三位为 b001，A = 0 表示这个chunk 不属于主分配区，M
 
 所以，最后 size of chunk 的值为：
 
-```
+```powershell
 0x0400 + 0x10 + 0x01 = 0x0411
 ```
 
@@ -340,7 +340,7 @@ int main() {
 
 与前面的类似，使用 gdb 查看 addr 前 16 字节开始的内存情况，如下所示：
 
-```
+```powershell
 (gdb) x/32bx 0x7ffff00008c0 - 0x10
 0x7ffff00008b0: 0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00
 0x7ffff00008b8: 0x15    0x00    0x02    0x00    0x00    0x00    0x00    0x00
@@ -359,7 +359,7 @@ int main() {
 
 当一个 chunk 正在被使用时，它的下一个 chunk 的 prev_size 是没有意义的，这 8 个字节可以被这个当前 chunk 使用。别奇怪，就是这么抠。接下来我们来看看 chunk 中 prev_size 的复用。测试的代码如下：
 
-```
+```c
 #include <stdlib.h>
 #include <string.h>
 void main() {
@@ -372,7 +372,7 @@ void main() {
 
 编译这个源文件，然后使用 gdb 调试单步运行，查看 p1、p2 的地址：
 
-```
+```powershell
 
 p/x p1
 $2 = 0x602010
@@ -383,7 +383,7 @@ $3 = 0x602030
 
 然后输出 p1、p2 附近的内存区域：
 
-```
+```powershell
 (gdb) x/64bx p1-0x10
 0x602000:       0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00
 0x602008:       0x21    0x00    0x00    0x00    0x00    0x00    0x00    0x00
@@ -397,7 +397,7 @@ $3 = 0x602030
 ```
 布局如下图所示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/87f7105f18694cdb811dace70a872648~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory30.png)
 
 
 malloc 的大小需要按照一定的规则对齐：
@@ -430,7 +430,7 @@ bin 的字面意思是「垃圾箱」。内存在应用调用 free 释放以后 
 
 内存的回收站分为两大类，第一类是普通的 bin，一类是 fastbin。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/90bf0c4d643c4aab8d805bcfdf61c897~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory31.png)
 
 
 fastbin 采用单向链表，每条链表的中空闲 chunk 大小是确定的，插入删除都在队尾进行。
@@ -439,11 +439,11 @@ fastbin 采用单向链表，每条链表的中空闲 chunk 大小是确定的�
 
 普通 bin 采用双向链表存储，以数组形式定义，共 254 个元素，两个数组元素组成一个 bin，通过 fd、bk 组成双向循环链表，结构有点像九连环玩具。
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/e401962ed5a341eeabd920e00bcb41be~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="70%"/></p>
+![](image/memory32.png)
 
 所以普通 bin 的总个数是 254/2 = 127 个。其中 unsorted bin 只有 1 个，small 有 62 个，large bin 有 63 个，还有一个暂未使用，如下图所示：
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/cc420cad74b94fac9afa9fdc0a9f2213~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="90%"/></p>
+![](image/memory33.png)
 
 
 
@@ -459,7 +459,7 @@ fastbin 采用单向链表，每条链表的中空闲 chunk 大小是确定的�
 
 其中 smallbin 用于维护 <= 1024B 的 chunk 内存块。同一条 small bin 链中的 chunk 具有相同的大小，都为 index * 16，结构如下图所示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/e12ae2611eb84833bda9dbff50578272~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory34.png)
 
 #### large bin 的内部结构
 
@@ -470,7 +470,7 @@ largebin 中同一条链中的 chunk 具有「不同」的大小：
 
 结构如下图所示：
 
-![largebin](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/18c278838f7949468c9dffe7df241acd~tplv-k3u1fbpfcp-zoom-1.image)
+![largebin](image/memory35.png)
 
 #### unsorted bin 的内部结构
 
@@ -481,11 +481,11 @@ unsorted bin 只有一条双向链表，它的特点如下：
 
 它的结构如下图所示：
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/90c5f3c45a2e4aa096d18b0b2e48d7fc~tplv-k3u1fbpfcp-zoom-1.image" alt="unsorted_bin"  width="70%"/></p>
+![](image/memory36.png)
 
 下面是所有普通 bin 的概览图：
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/40ec9f5b28cc43c7af7fc1699927c60e~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="95%"/></p>
+![](image/memory37.png)
 
 #### fast bin 的内部结构
 
@@ -493,7 +493,7 @@ unsorted bin 只有一条双向链表，它的特点如下：
 
 FastBin 专门用来提高小内存的分配效率，它的结构如下：
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/c45c0ce7003f4cbd8fc24fe3ac774769~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="90%"/></p>
+![](image/memory38.png)
 
 它有下面这些特性：
 
@@ -516,7 +516,7 @@ Fast bins 可以看作是 small bins 的一小部分 cache。
 
 如下图所示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/8d1279f230c048b694ae932433bd2436~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory39.png)
 
 接下来我们来回答最后一个问题，内存 free 以后去了哪里，根据不同的大小，有不同的处理策略。
 
@@ -525,6 +525,6 @@ Fast bins 可以看作是 small bins 的一小部分 cache。
 - 大部分是介于中间的，释放的时候首先会被放入 unsorted bin。根据情况合并、迁移空闲块，靠近 top 则更新 top chunk。这才是人生常态啊。
 
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/39bc48e470a340749ba6a076ca3f854b~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/memory40.png)
 
 到这里，我们 glibc 的内存申请和释放原理就介绍的差不多了，如果想了解更深入的信息，可以去调试 glibc 的源码。

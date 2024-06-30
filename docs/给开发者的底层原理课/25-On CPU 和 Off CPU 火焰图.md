@@ -11,7 +11,7 @@
 
 下面是一个 MySQL 的 On CPU 火焰图：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/8bb4cfb3cc804952b06dd3739af3ce8f~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/cpu.png)
 
 该怎么样来看这个火焰图呢？
 
@@ -24,7 +24,7 @@
 
 接下来我们来看看 On CPU 火焰图是如何生成的。待测试的代码如下：
 
-```
+```c
 #include <pthread.h>
 
 
@@ -58,14 +58,14 @@ int main(void) {
 
 编译运行这个程序：
 
-```
+```powershell
 $ gcc -std=c99 flame_test.c; 
 $ ./a.out
 ```
 
 OpenResty 的作者章亦春在他的 openresty-systemtap-toolkit 工具集中提供了一个 sample-bt 脚本。这个脚本其实就是对 systemtap 的一个封装，这个脚本根据不同的参数值，生成了不同的 systemtap 脚本，然后调用 systemtap 执行这个脚本：
 
-```
+```powershell
 sudo ./sample-bt -p `pidof a.out` -t 30 -u > tmp.bt
 ```
 
@@ -73,7 +73,7 @@ sudo ./sample-bt -p `pidof a.out` -t 30 -u > tmp.bt
 
 这个脚本运行 30s 以后会自动退出，在生成的 tmp.bt 文件中，我们可以看到 systemtap 采集的数据其实是堆栈数据和对应堆栈出现的次数。
 
-```
+```powershell
 $ cat tmp.bt
 
  0x400561 : func_c+0x15/0x1b [/home/ya/dev/linux_study/process/flamegraph/a.out]
@@ -91,7 +91,7 @@ $ cat tmp.bt
 
 接下来我们使用 Brendan Gregg 提供的 FlameGraph 工具集中的 stackcollapse-stap.pl 折叠上面的堆栈信息。
 
-```
+```powershell
 git clone https://github.com/brendangregg/FlameGraph
 cd  FlameGraph
 
@@ -100,7 +100,7 @@ cd  FlameGraph
 
 这个所说的“折叠”其实就是把上面堆栈信息简化，stap_unfolded.out 文件的内容如下：
 
-```
+```powershell
 $ cat stap_unfolded.out
 _start;__libc_start_main;main 8878
 _start;__libc_start_main;main;func_a 3097
@@ -113,13 +113,13 @@ _start;__libc_start_main;main;func_c 10429
 
 接下来，还有一步是用 flamegraph.pl 工具将前面生成的折叠信息生成为一个 svg 图。
 
-```
+```powershell
 ./flamegraph.pl stap_unfolded.out > stap-out.svg
 ```
 
 生成的 svg 图如下：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/cd5d6d098afb4fd9baed8c21526681ec~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/cpu2.png)
 
 把鼠标循环在 main 函数上，可以看到 main 函数在 30s 采用时间内共被采样了 29983 次，占比 100%。把鼠标悬浮在对应的函数上，可以看到 main、func_a、func_b、func_c、func_d 的采样次数和比例，其中：
 
@@ -133,7 +133,7 @@ _start;__libc_start_main;main;func_c 10429
 
 sample-bt 工具还提供了一个贴心的 -d 参数可以将生成的 systemtap 脚本打印出来。
 
-```
+```c
 global bts;
 global quit = 0;
 
@@ -171,7 +171,7 @@ probe timer.s(30) {
 
 timer.profile 是每个 CPU 上周期触发的定时器，我们可以通过一个实验看看它触发的频率。
 
-```
+```c
 global stick, ptick
 
 probe timer.profile { 
@@ -185,7 +185,7 @@ probe timer.s(1) {
 
 使用 stap 运行上面的脚本，输出结果如下：
 
-```
+```powershell
 sudo stap timer.stp
 
 2000
@@ -200,7 +200,7 @@ sudo stap timer.stp
 
 在每次采样里，systemtap 使用 bts 记录当前的用户堆栈信息。
 
-```
+```c
 bts[ubacktrace()] <<< 1;
 ```
 
@@ -208,7 +208,7 @@ bts[ubacktrace()] <<< 1;
 
 `<<<` 是 systemtap 的语法，用来做 aggregate 统计，它使用「<<< value」运算来把一个 value 加到这个集合里。以下面的脚本为例：
 
-```
+```c
 map["foo"] <<< 10
 map["foo"] <<< 12
 map["foo"] <<< 5
@@ -216,13 +216,13 @@ map["foo"] <<< 5
 
 执行完上面的三行语句以后，map 集合里存储的数据可以理解为下面这样：
 
-```
+```c
 map["foo"] = listof(10, 12, 5)
 ```
 
 接下来就可以对这个列表的数据做聚合运算，计算次数、求和、最大值、最小值、平均值等。
 
-```
+```c
 global map
 probe begin {
     map["foo"] <<< 10
@@ -238,7 +238,7 @@ probe begin {
 
 运行上面的脚本，输出结果如下：
 
-```
+```powershell
 $ sudo stap aggre.stap
 
 count: 3
@@ -266,7 +266,7 @@ avg  : 9
 
 使用 perf 生成火焰图的过程如下：
 
-```
+```powershell
 perf record -F 99 -a -g -- sleep 30
 perf script | ./stackcollapse-perf.pl > out.perf-folded
 ./flamegraph.pl out.perf-folded > perf-out.svg
@@ -288,13 +288,13 @@ perf script | ./stackcollapse-perf.pl > out.perf-folded
 
 Brendan Gregg 的博客中有一个图很清楚的 On CPU 和 Off CPU 的一些场景，如下所示：
 
-![inline](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/e6c4ff69d67c4f089a1fbe7bd25fee69~tplv-k3u1fbpfcp-zoom-1.image)
+![inline](image/cpu3.png)
 
 图中蓝色的部分都是 Off CPU 的范畴，红色是 On Cpu 的范畴。
 
 接下来我们用实际的代码来进行测试：
 
-```
+```c
 #include <sys/epoll.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -320,7 +320,7 @@ int main() {
 
 同样我们可以用 systemtap 来生成 Off CPU 的 profile 数据，章亦春的 openresty-systemtap-toolkit 中有一个名为 sample-bt-off-cpu 的脚本，生成火焰图的过程如下：
 
-```
+```powershell
 sudo ./sample-bt-off-cpu -p `pidof a.out` -t 5 -u > tmp.bt
 
 ./stackcollapse-stap.pl tmp.bt > stap_unfolded.out
@@ -330,14 +330,14 @@ sudo ./sample-bt-off-cpu -p `pidof a.out` -t 5 -u > tmp.bt
 生成的 svg 图如下所示：
 
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/0939c148c883421e8326ef07837a0ceb~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/cpu4.png)
 
 
 可以看到 usleep 函数占比是 60%，epoll_wait 占比是 40%，对应 epoll 和 sleep 阻塞和睡眠的时间比例。
 
 接下来我们来看 sample-bt-off-cpu 生成 Off CPU 火焰图的原理，同之前一样，它也是用 systemtap 采集数据。sample-bt-off-cpu 有一个 `-d` 参数可以输出 systemtap 的脚本。
 
-```
+```c
 global bts
 global start_time
 

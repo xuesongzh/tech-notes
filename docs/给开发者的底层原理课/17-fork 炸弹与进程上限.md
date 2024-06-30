@@ -7,7 +7,7 @@
 
 为了防止单个用户耗尽了所有的进程数，Linux 对单个用户能创建的进程数量也做了限制，使用 ulimit -a 命令可以方便地查看这些限制：
 
-```
+```powershell
 $ ulimit -a
 -t: cpu time (seconds)              unlimited
 -f: file size (blocks)              unlimited
@@ -34,7 +34,7 @@ $ ulimit -a
 
 提到进程数量限制，不得不提到著名的进程 fork 炸弹，这是一种通过无限制地创建新进程来耗尽系统资源的攻击方式，最经典的 Fork 炸弹由 Jaromil 在 2002 年设计，仅用 13 个字符实现。其源码如下：
 
-```
+```powershell
 :(){:|:&};:
 ```
 
@@ -55,7 +55,7 @@ $ ulimit -a
 
 我们也可以用下面的 C 代码来实现类似的功能：
 
-```
+```c
 #include <unistd.h>
 
 int main(void) {
@@ -68,14 +68,14 @@ int main(void) {
 
 编译上面的代码，然后将 forkbomb 放在后台执行：
 
-```
+```powershell
 gcc -o forkbomb forkbomb.c
 ./forkbomb &
 ```
 
 输出的结果如下所示：
 
-```
+```powershell
 $ ./forkbomb &
 [1] 15936
 
@@ -84,21 +84,21 @@ zsh: fork failed: resource temporarily unavailable
 
 这时再在命令行中执行任何命令，都会提示失败：
 
-```
+```powershell
 $ ps
 zsh: fork failed: resource temporarily unavailable
 ```
 
 这个时候想杀掉  forkbomb 进程也无法实现，因为执行命令也需要新建一个进程，而 forkbomb 程序已经耗尽了当前用户所有的进程数。即使通过 SSH 登录这台机器也会失败，提示如下：
 
-```
+```powershell
 $ ssh ya@c4
 shell request failed on channel 0
 ```
 
 这时我们以 root 用户 ssh 登录这台机器是可以的，因为 forkbomb 程序只是耗尽了普通用户 `ya` 的所有进程数。使用 ps 查看所有用户启动的进程数统计，如下所示：
 
-```
+```powershell
 [root@c4 ~]# ps -A -o user | sort | uniq -c
       1 chrony
       1 dbus
@@ -111,14 +111,14 @@ shell request failed on channel 0
 
 可以看到 ya 用户正好启动了 4096 个进程，使用 ps 或者 pgrep 统计一下 forkbomb 的进程数量，可以看到一共启动了 4092 个 forkbomb 程序。
 
-```
+```powershell
 [root@c4 ~]# pgrep forkbomb | wc -l
 4092
 ```
 
 可以使用 kill 杀掉所有的 forkbomb 进程。
 
-```
+```powershell
 [root@c4 ~]# pgrep forkbomb | xargs kill
 ```
 
@@ -160,5 +160,4 @@ google 的工程师在写这个代码是没有去检查 setgid、setuid 的返�
 ## 小结
 
 经过上面的介绍，我们就知道需要特别注意 Linux 系统中进程数量的限制，避免单个用户或系统耗尽进程数量上限，同时在编写权限相关的代码时，一定要检查 setuid/setgid 等系统调用的返回值，确保操作是成功的才继续后面的流程。
-
 

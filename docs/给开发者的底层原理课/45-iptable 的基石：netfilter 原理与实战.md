@@ -30,14 +30,16 @@ NF\_HOOK 宏会遍历所有注册的Netfilter钩子函数，并根据它们的�
 
 linux 内核中 netfilter.h 定义的阶段了 netfilter 的 5 大阶段
 
-    enum nf_inet_hooks {
-    	NF_INET_PRE_ROUTING,
-    	NF_INET_LOCAL_IN,
-    	NF_INET_FORWARD,
-    	NF_INET_LOCAL_OUT,
-    	NF_INET_POST_ROUTING,
-    	NF_INET_NUMHOOKS // 这个除外
-    };
+```c
+enum nf_inet_hooks {
+	NF_INET_PRE_ROUTING,
+	NF_INET_LOCAL_IN,
+	NF_INET_FORWARD,
+	NF_INET_LOCAL_OUT,
+	NF_INET_POST_ROUTING,
+	NF_INET_NUMHOOKS // 这个除外
+};
+```
 
 其中 `NF_INET_NUMHOOKS` 并不是一个处理阶段，我们这里可以忽略之。iptables 的 5 条内置链正好对应 netfilter 的 5 大阶段。
 
@@ -63,7 +65,7 @@ linux 内核中 netfilter.h 定义的阶段了 netfilter 的 5 大阶段
 
 通过在这 5 个阶段注册钩子函数，Netfilter 可以实现对数据包的各种处理和过滤，从而构建防火墙、NAT、负载均衡等功能。iptables 就是在 Netfilter 上构建的一个用户态工具,用于配置 Netfilter 的规则。
 
-![netfilter-stage](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/42586a59480e4e52b1f3548b3d247362~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=3308\&h=3404\&s=798272\&e=jpg\&b=fef8f7)
+![netfilter-stage](image/iptables.png)
 
 ## 实战 1 ：netfilter 的 hello world
 
@@ -186,19 +188,21 @@ MODULE_DESCRIPTION("A simple module to print Hello World for ICMP packets");
 
 写一个 Makefile
 
-    KERNEL_SOURCE := /lib/modules/$(shell uname -r)/build
+```powershell
+KERNEL_SOURCE := /lib/modules/$(shell uname -r)/build
 
-    obj-m += helloworld.o
+obj-m += helloworld.o
 
-    all:
-    	make -C $(KERNEL_SOURCE) M=$(PWD) modules
+all:
+	make -C $(KERNEL_SOURCE) M=$(PWD) modules
 
-    clean:
-    	make -C $(KERNEL_SOURCE) M=$(PWD) clean
+clean:
+	make -C $(KERNEL_SOURCE) M=$(PWD) clean
+```
 
 编译这个内核模块，不出意外会生成一个 helloworld.ko 文件
 
-```
+```powershell
 $ make
 
 $ ls -lrth
@@ -208,21 +212,27 @@ $ ls -lrth
 
 把这个 ko 模块挂载到内核中。
 
-    sudo insmod helloworld.ko
+```powershell
+sudo insmod helloworld.ko
+```
 
 然后找另外一台机器 ping 一下当前机器（192.168.31.197）
 
-    $ ping 192.168.31.197
+```powershell
+$ ping 192.168.31.197
+```
 
 通过 dmesg 就可以看到日志了
 
-    $ dmesg -T
+```powershell
+$ dmesg -T
 
-    [二 4月  9 23:54:14 2024] Hello World, ICMP Packet Received
-    [二 4月  9 23:54:15 2024] Hello World, ICMP Packet Received
-    [二 4月  9 23:54:16 2024] Hello World, ICMP Packet Received
-    [二 4月  9 23:54:17 2024] Hello World, ICMP Packet Received
-    [二 4月  9 23:54:18 2024] Hello World, ICMP Packet Received
+[二 4月  9 23:54:14 2024] Hello World, ICMP Packet Received
+[二 4月  9 23:54:15 2024] Hello World, ICMP Packet Received
+[二 4月  9 23:54:16 2024] Hello World, ICMP Packet Received
+[二 4月  9 23:54:17 2024] Hello World, ICMP Packet Received
+[二 4月  9 23:54:18 2024] Hello World, ICMP Packet Received
+```
 
 ## 实战 2：实现防火墙禁用 ping
 
@@ -258,20 +268,24 @@ static unsigned int hook_func(
 
 在挂载 `pingdrop.ko` 之前，ping 当前机器，可以看到有 req 和对应的 reply。
 
-    $ sudo tcpdump -i any icmp -nn
+```powershell
+$ sudo tcpdump -i any icmp -nn
 
-    23:13:19.009093 IP 192.168.31.33 > 192.168.31.197: ICMP echo request, id 16691, seq 2, length 64
-    23:13:19.009140 IP 192.168.31.197 > 192.168.31.33: ICMP echo reply, id 16691, seq 2, length 64
-    23:13:20.011848 IP 192.168.31.33 > 192.168.31.197: ICMP echo request, id 16691, seq 3, length 64
-    23:13:20.011891 IP 192.168.31.197 > 192.168.31.33: ICMP echo reply, id 16691, seq 3, length 64
+23:13:19.009093 IP 192.168.31.33 > 192.168.31.197: ICMP echo request, id 16691, seq 2, length 64
+23:13:19.009140 IP 192.168.31.197 > 192.168.31.33: ICMP echo reply, id 16691, seq 2, length 64
+23:13:20.011848 IP 192.168.31.33 > 192.168.31.197: ICMP echo request, id 16691, seq 3, length 64
+23:13:20.011891 IP 192.168.31.197 > 192.168.31.33: ICMP echo reply, id 16691, seq 3, length 64
+```
 
 这个时候挂载 `pingdrop.ko`
 
-    sudo insmod pingdrop.ko
+```powershell
+sudo insmod pingdrop.ko
+```
 
 从 ping 的发起方看请求都是 timeout
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dbe64c4350784e978c9347c20e832a0e~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1304\&h=740\&s=217695\&e=jpg\&b=010101)
+![](image/iptables2.png)
 
 这样我们就实现了一个简单的防火墙，禁用了 icmp 请求。
 

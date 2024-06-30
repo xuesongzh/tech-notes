@@ -14,11 +14,15 @@ LD\_PRELOAD 是一个环境变量，通过 LD\_PRELOAD 这个环境变量指定�
 
 dlsym 的作用是在一个已经打开的动态链接库中查找符号（函数或变量）的地址，定义如下：
 
-    void *dlsym(void *handle, const char *symbol);
+```c
+void *dlsym(void *handle, const char *symbol);
+```
 
 其中 handle 是动态链接库句柄，symbol是要查找的符号名（函数或变量）。比如查找 printf 函数：
 
-    dlsym(RTLD_NEXT, "printf");
+```c
+dlsym(RTLD_NEXT, "printf");
+```
 
 RTLD\_NEXT 是一个特殊的标记，使用 `RTLD_NEXT` 时 dlsym 会从当前共享对象之后的下一个共享对象中查找 printf 函数的地址。
 
@@ -26,14 +30,18 @@ RTLD\_NEXT 是一个特殊的标记，使用 `RTLD_NEXT` 时 dlsym 会从当前�
 
 先来看一下 `open` 函数的原始定义：
 
-    #include <fcntl.h>
+```c
+#include <fcntl.h>
 
-    int open(const char *pathname, int flags, ...
-              /* mode_t mode */ );
+int open(const char *pathname, int flags, ...
+          /* mode_t mode */ );
+```
 
 为了实现 open 函数的 hook，我们需要定义一个 open 函数的函数指针定义 orig\_open ，用来接受 dlsym 函数的返回值。
 
-    int (*orig_open)(const char *, int, ...);
+```c
+int (*orig_open)(const char *, int, ...);
+```
 
 完整的代码如下：
 
@@ -57,17 +65,21 @@ int open(const char *filename, int flags, ...) {
 
 把这个文件编译为 `open_hook.so` 文件：
 
-    gcc -shared -fPIC -o open_hook.so open_hook.c -ldl
+```powershell
+gcc -shared -fPIC -o open_hook.so open_hook.c -ldl
+```
 
 
 用 LD\_PRELOAD 加载，就可以拦截目标进程的文件访问，输出审计日志：
 
-    » LD_PRELOAD=./open_hook.so cat /etc/hosts
+```powershell
+» LD_PRELOAD=./open_hook.so cat /etc/hosts
 
-    [audit] open /etc/hosts, fd: 3
-    127.0.0.1       localhost.localdomain   localhost 
-    ::1             localhost6.localdomain6 localhost6
-    ...
+[audit] open /etc/hosts, fd: 3
+127.0.0.1       localhost.localdomain   localhost 
+::1             localhost6.localdomain6 localhost6
+...
+```
 
 通过 LD\_PRELOAD 审计，我们就可以记录 cat 命令读取和输出 /etc/passwd 文件的过程。
 
@@ -105,11 +117,11 @@ void *malloc(size_t size) {
 
 此时我们执行 `LD_PRELOAD=./malloc_hook.so ps -ef` 会发现 ps 命令没有很好地处理 malloc 返回异常的情况，直接 panic 了。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/33bfcb8c3659490e80aa17a65732f663~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1970\&h=274\&s=82363\&e=jpg\&b=1e1f23)
+![](image/panic.png)
 
 而有些命令则很好的处理了，比如 `LD_PRELOAD=./malloc_hook.so ls` 命令。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/091e6f88c611412a8bfd232b9179d71e~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1110\&h=288\&s=55595\&e=jpg\&b=1e1f23)
+![](image/ld.png)
 
 
 ## 使用 ld\_preload 来做内存分析
@@ -118,14 +130,16 @@ void *malloc(size_t size) {
 
 从源码编译 tcmalloc（<https://github.com/gperftools/gperftools>） LD\_PRELOAD 来 hook 内存分配释放的函数：
 
-    HEAPPROFILE=./heap.log 
-    HEAP_PROFILE_ALLOCATION_INTERVAL=104857600 
-    LD_PRELOAD=./libtcmalloc_and_profiler.so
-    java -jar xxx ..
+```powershell
+HEAPPROFILE=./heap.log 
+HEAP_PROFILE_ALLOCATION_INTERVAL=104857600 
+LD_PRELOAD=./libtcmalloc_and_profiler.so
+java -jar xxx ..
+```
 
 启动过程中就会看到生成了很多内存 dump 的分析文件，接下来使用 pprof 将 heap 文件转为可读性比较好的 pdf 文件。内存申请的链路如下图所示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5d05e988013841de817969c6e576e285~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1512\&h=938\&s=218444\&e=jpg\&b=fefefe)
+![](image/dump.png)
 
 通过这里可以看到绝大部分的内存申请都耗在了 Java\_java\_util\_zip\_Inflater\_inflateBytes，接下来就可以进一步分析。
 

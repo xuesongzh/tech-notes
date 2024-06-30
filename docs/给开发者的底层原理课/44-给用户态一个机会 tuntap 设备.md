@@ -29,7 +29,7 @@ TUN/TAP 设备在 VPN、容器、虚拟化等领域有着广泛的应用，例�
 
 如下图所示：
 
-![tun](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/cfa2c17afd6d438792114d318eedd0a5~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=3395\&h=1808\&s=733700\&e=jpg\&b=fefdfd)
+![tun](image/tun.png)
 
 下面是一个使用 TUN 设备的简单示例，它展示了如何创建并配置一个 TUN 设备，并从该设备读取数据包：
 
@@ -102,7 +102,7 @@ int main() {
 
 编译运行上面的代码，但是别急，此时 tun1 还没有 ip 地址也还没有被启用。给 tun1 设备配置 IP 地址并启用它：
 
-```shell
+```powershell
 $ ip addr add 10.0.5.100/24 dev tun1
 $ ip link set tun1 up
 
@@ -119,34 +119,38 @@ tun1: flags=4305<UP,POINTOPOINT,RUNNING,NOARP,MULTICAST>  mtu 1500
 
 通过 `route -n` 我们可以知道所有去往 `10.0.5.0` 包都会经过 tun1 网卡
 
-    $ route -n                                                                                                         
-    Kernel IP routing table
-    Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
-    0.0.0.0         192.168.31.1    0.0.0.0         UG    100    0        0 enp0s31f6
-    10.0.5.0        0.0.0.0         255.255.255.0   U     0      0        0 tun1
+```powershell
+$ route -n                                                                                                         
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.31.1    0.0.0.0         UG    100    0        0 enp0s31f6
+10.0.5.0        0.0.0.0         255.255.255.0   U     0      0        0 tun1
+```
 
 此时如果 ping 一个 10.0.5.0/24 网段内的 IP，例如 10.0.5.101，我们的程序就可以收到相应的 ICMP 包，并打印出包的内容。这表明数据包已经被成功地发送到了用户空间程序。在我们的应用进程就收到了对应的 icmp 包，对应的数据如下：
 
-    IP Header
-       |-Version        : 4
-       |-Header Length  : 20 Bytes
-       |-Type Of Service: 0
-       |-Total Length   : 21504 Bytes
-       |-Identification : 53078
-       |-TTL            : 64
-       |-Protocol       : 1
-       |-Checksum       : 4549
-       |-Source IP      : 10.0.5.100
-       |-Destination IP : 10.0.5.101
-    Data Payload:
-    	08 00 FC 5D 64 68 00 69
-    	D3 74 AF 65 00 00 00 00
-    	4E 23 07 00 00 00 00 00
-    	10 11 12 13 14 15 16 17
-    	18 19 1A 1B 1C 1D 1E 1F
-    	20 21 22 23 24 25 26 27
-    	28 29 2A 2B 2C 2D 2E 2F
-    	30 31 32 33 34 35 36 37
+```powershell
+IP Header
+   |-Version        : 4
+   |-Header Length  : 20 Bytes
+   |-Type Of Service: 0
+   |-Total Length   : 21504 Bytes
+   |-Identification : 53078
+   |-TTL            : 64
+   |-Protocol       : 1
+   |-Checksum       : 4549
+   |-Source IP      : 10.0.5.100
+   |-Destination IP : 10.0.5.101
+Data Payload:
+	08 00 FC 5D 64 68 00 69
+	D3 74 AF 65 00 00 00 00
+	4E 23 07 00 00 00 00 00
+	10 11 12 13 14 15 16 17
+	18 19 1A 1B 1C 1D 1E 1F
+	20 21 22 23 24 25 26 27
+	28 29 2A 2B 2C 2D 2E 2F
+	30 31 32 33 34 35 36 37
+```
 
 ## 使用 TUN/TAP 实现用户态 TCP 协议
 

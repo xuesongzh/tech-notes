@@ -23,7 +23,7 @@ CFS 算法中，进程的优先级被弱化，强调更多的是进程的权重�
 
 整个过程如下图所示：
 
-![vruntime](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/31662da881294fd29222beb54f0f43ae~tplv-k3u1fbpfcp-zoom-1.image)
+![vruntime](image/vruntime.png)
 
 
 可以看到从拉长时间来看，权重高的 A 进程执行的次数比 B 和 C 多一倍，这正是进程权重对调度的影响。
@@ -48,7 +48,7 @@ vruntime 的具体计算方式如下：
 Linux 维护了一个 nice 值优先级到权重的映射关系表，nice 值为 0 的进程的权重是 1024。
 
 
-```
+```c
 static const int prio_to_weight[40] = {
  /* -20 */     88761,     71755,     56483,     46273,     36291,
  /* -15 */     29154,     23254,     18705,     14949,     11916,
@@ -63,20 +63,20 @@ static const int prio_to_weight[40] = {
 
 nice 值为 -5 的权重值为 3121，差不多是 nice 值为 0 的进程的三倍。
 
-```
+```c
 vruntime（NICE:-5） += delta_exec * 1024 / 3121
 ```
 
 也就是：
 
-```
+```c
 vruntime（NICE:-5） += delta_exec / 3
 ```
 
 
 对于一个 nice 值为 0 的进程而言，vruntime 计算方式如下：
 
-```
+```c
 vruntime（NICE:0） += delta_exec
 ```
 
@@ -84,7 +84,7 @@ vruntime（NICE:0） += delta_exec
 
 我们来做一个实验，启动两个 busy -j2 进程，默认情况下，在我的双核虚拟机上，这个两个进程平分了 200% 的 CPU 资源，各占了 100% 的 CPU。
 
-```
+```powershell
 $ top
 
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
@@ -94,7 +94,7 @@ $ top
 
 接下来我们使用 renice 命令设置其中一个进程的 NICE 值：
 
-```
+```powershell
 $ sudo renice -n -5 -g 20342
 
 20342 (process group ID) old priority 0, new priority -5
@@ -103,7 +103,7 @@ $ sudo renice -n -5 -g 20342
 此时 top 命令的 CPU 占用已经出现了改变：
 
 
-```
+```powershell
 $ top
 
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
@@ -120,7 +120,7 @@ nice 值为 -5 的进程 CPU 占用率提高到了 150%，nice 值为 0 的进�
 
 这个时间间隔由系统变量 `/proc/sys/kernel/sched_latency_ns` 决定，表示一个调度周期，以纳秒为单位。
 
-```
+```powershell
 $ cat /proc/sys/kernel/sched_latency_ns
                                                                       
 12000000
@@ -139,14 +139,14 @@ CFS 也考虑到了这个问题，引入了进程占用 CPU 的最小时间 sche
 
 可以用下面的公式来理解 CFS 的调度周期：
 
-```
+```c
 period = max(sched_latency_ns, sched_min_granularity_ns * nr_tasks)
 ```
 
 
 在 Linux 中，这个值由 `/proc/sys/kernel/sched_min_granularity_ns` 决定。
 
-```
+```powershell
 $ cat /proc/sys/kernel/sched_min_granularity_ns
 
 10000000
@@ -156,7 +156,7 @@ $ cat /proc/sys/kernel/sched_min_granularity_ns
 
 
 > 新创建的进程 vruntime 是 0 吗？
-    
+
 根据前面的描述，vruntime 最小的进程会最优先被调度，如果新创建的进程 vruntime 为 0，那么对于老进程就太不公平了。于是 CFS 为每个运行队列维护了整个队列 vruntime 的最小值（min_vruntime），进程初始的 vruntime 会被限制不会小于 min_vruntime。
 
 除了有上面的限制之外，新创建的进程的 vruntime 还与下面两个属性有关系。
@@ -184,8 +184,7 @@ CFS 需要有一个高效的数据结构来支撑对 vruntime 进行排序，同
 
 红黑树中每个节点上保存的是进程（线程）虚拟运行时间（vitrual runtime），如下图所示：
 
-
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/efb9000470b84166811cbc36c3feda73~tplv-k3u1fbpfcp-zoom-1.image" alt=""  width="70%"/></p>
+![](image/vruntime2.png)
 
 查找最左侧节点的的复杂度为 O(1)，非常适合 CFS 调度算法用来查找运行进程中受到最不公平待遇的进程。
 

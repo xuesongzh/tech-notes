@@ -4,11 +4,13 @@ ARP(Address Resolution Protocol)是一种用于解析网络层地址(如IP地址
 
 `ip neighbour` 命令用于查看 ARP 缓存，可以简写为 `ip neigh` 或者更简短的 `ip n`。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/0e225a71a23841638dae9039ae51cde6~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1354\&h=560\&s=251900\&e=jpg\&b=010101)
+![](image/arp.png)
 
 每一行的格式如下:
 
-    <IP地址> dev <网络接口> lladdr <MAC地址> <状态>
+```powershell
+<IP地址> dev <网络接口> lladdr <MAC地址> <状态>
+```
 
 为了更好的理解 ARP 协议，我们需要搞懂 ARP 的状态机。
 
@@ -58,13 +60,15 @@ gc\_interval 决定了 ARP 缓存垃圾回收的频率，默认值为 30 秒。
 
 我们先来把 gc\_thresh 的值调小为 20，方便复现。
 
-    sudo sysctl -w net.ipv4.neigh.default.gc_thresh1=20
-    sudo sysctl -w net.ipv4.neigh.default.gc_thresh2=20
-    sudo sysctl -w net.ipv4.neigh.default.gc_thresh3=20
+```powershell
+sudo sysctl -w net.ipv4.neigh.default.gc_thresh1=20
+sudo sysctl -w net.ipv4.neigh.default.gc_thresh2=20
+sudo sysctl -w net.ipv4.neigh.default.gc_thresh3=20
+```
 
 接下来使用 ip 命令手动批量添加 arp 记录，添加 192.168.31.101 到 192.168.31.200 区间的 arp 记录。
 
-```bash
+```powershell
 #!/bin/bash
 
 start=101
@@ -79,11 +83,11 @@ done
 
 此时查看当时的 arp 记录，可以看到有 20 条
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/30ba99a3cecf460e8b69671de306c72d~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1624\&h=1064\&s=610037\&e=jpg\&b=010101)
+![](image/arp2.png)
 
 此时 ping 一下局域网里的另外一个 ip（192.168.31.71），可以看到在很长一段时间都是不成功的，直到 gc 的时间到，才有机会插入 ARP 表记录，完成后续的 ARP 解析。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/bc807dade3ac4983b4ba035c372c32bd~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1428\&h=1310\&s=441915\&e=jpg\&b=010101)
+![](image/arp3.png)
 
 ## ARP PERMANENT 状态
 
@@ -91,11 +95,13 @@ PERMANENT 状态的 ARP 表项不会被自动过期被回收，它们会一直�
 
 下面是使用 ip 命令添加的 PERMANENT 状态的 ARP 记录。
 
-    $ sudo ip neigh add 192.168.31.10 lladdr 00:11:22:33:44:55 dev enp0s31f6 nud permanent
+```powershell
+$ sudo ip neigh add 192.168.31.10 lladdr 00:11:22:33:44:55 dev enp0s31f6 nud permanent
 
-    $ ip n
-    192.168.31.10 dev enp0s31f6 lladdr 00:11:22:33:44:55 PERMANENT
-    ...
+$ ip n
+192.168.31.10 dev enp0s31f6 lladdr 00:11:22:33:44:55 PERMANENT
+...
+```
 
 ## ARP 回收的内核实现
 
@@ -311,16 +317,18 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 
 经仔细排查，发现是故障机器上 10.7.0.1 的 ARP 记录 mac 地址居然是错误的。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/958b3ee9fbfa4d7ca754fc142fbfdfff~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1838\&h=180\&s=134281\&e=jpg\&b=010101)
+![](image/arp4.png)
 
 真正 DNS 服务器 10.7.0.1 的 mac 地址应该是 `bc:99:30:89:e0:f0`。这就有点奇怪了，于是先删除原纪录然后添加一条 permanent 的 arp 记录。
 
-    ip n del 10.7.0.1 dev eth0
-    ip n add 10.7.0.1 lladdr bc:99:30:89:e0:f0 dev eth0 nud permanent
+```powershell
+ip n del 10.7.0.1 dev eth0
+ip n add 10.7.0.1 lladdr bc:99:30:89:e0:f0 dev eth0 nud permanent
+```
 
 做了这个操作以后，我们边缘服务器的 DNS 解析就正常了。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/3b6f351fd83c4a15beba99f278531cbf~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1214\&h=1738\&s=498259\&e=jpg\&b=020202)
+![](image/arp5.png)
 
 后面经过排查，发现是因为局域网内有一台主机误把 ip 配置为了 10.7.0.1，导致 ip 冲突，arp 局部网广播时，会把 ARP 记录指向了这台错误主机。我们下线掉这个主机，DNS 服务就完全恢复正常了。
 

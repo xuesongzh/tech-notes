@@ -96,13 +96,13 @@ static void sigreap(int signo) {
 
 然后编译为二进制文件：
 
-```
+```powershell
 gcc -Os -Wall -Werror -static pause.c -o pause
 ```
 
 接下来写一个 Dockerfile：
 
-```
+```powershell
 FROM scratch
 ARG ARCH
 ADD ./pause /pause
@@ -111,7 +111,7 @@ ENTRYPOINT ["/pause"]
 
 使用 docker 构建名为 pause-me 的镜像：
 
-```
+```powershell
 $ docker build . -t pause-me
 
 $ docker images
@@ -121,13 +121,13 @@ pause-me              latest    86088a28cca0   5 seconds ago   851kB
 
 然后运行这个镜像：
 
-```
+```powershell
 $ docker run --name pause-me pause-me:latest
 ```
 
 接下来我们运行两个新的容器，openresty 和 redis，并加入到 pause 的 PID namespace 中。
 
-```
+```powershell
 docker run -d --pid=container:pause-me openresty/openresty:jammy
 
 docker run -d --pid=container:pause-me redis
@@ -136,7 +136,7 @@ docker run -d --pid=container:pause-me redis
 
 进入到 openresty 的容器中，使用 ps 查看：
 
-```shell
+```powershell
 # ps -ef
 UID        PID  PPID  C STIME TTY          TIME CMD
 root         1     0  0 09:00 ?        00:00:00 /pause
@@ -185,14 +185,14 @@ int main() {
 
 把这个程序进行编译：
 
-```
+```powershell
 $ gcc -Os -Wall -static zombie_demo.c  -o zombie_demo
 ```
 
 
 同样把这个程序打包为 Docker 镜像，Dockerfile 如下：
 
-```
+```powershell
 FROM busybox:latest
 ADD ./zombie_demo /zombie_demo
 ENTRYPOINT ["/zombie_demo"]
@@ -200,14 +200,14 @@ ENTRYPOINT ["/zombie_demo"]
 
 使用 docker build 构建这个镜像：
 
-```
+```powershell
 docker build . -t zombie_demo
 ```
 
 
 然后加入到 pause 容器的 pid 命名空间：
 
-```
+```powershell
 $ docker run --pid=container:pause-me  zombie_demo
 
 Parent process (PID=32), child PID=38
@@ -219,7 +219,7 @@ Parent not reaping child, so it becomes a zombie
 
 这个时候来看 pause 容器的输出：
 
-```
+```powershell
 $ docker run --name pause-me pause-me:latest
 
 waitpid return, pid is: 38

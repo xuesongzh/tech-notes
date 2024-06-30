@@ -8,7 +8,7 @@
 
 Nginx 的 CPU 亲和性配置比较简单，通过 worker_cpu_affinity 指令配置即可。比如一个可能的配置项如下：
 
-```
+```powershell
 worker_processes    4;
 worker_cpu_affinity 0001 0010 0100 1000;
 ```
@@ -17,7 +17,7 @@ worker_cpu_affinity 后面的数字表示 0~n 号 worker 进程的 CPU 二进制
 
 通过 ps 命令可以进程的 affinity：
 
-```
+```powershell
 $ ps -efHF | grep nginx
 
 UID        PID  PPID  C    SZ   RSS PSR STIME TTY          TIME CMD
@@ -34,13 +34,13 @@ www-data 16279  1840  0 35946  6304   3 02:13 ?        00:00:00     nginx: worke
 
 Linux 提供了一个 taskset 命令修改进程的 CPU 亲和性。以下面的 busy 程序为例：
 
-```
+```powershell
 ./busy -j4
 ```
 
 在我的双核机器上，这个进程跑满了 200% 的 CPU，此时执行 taskset 命令将这个进程绑定到 1 号 CPU 上。
 
-```
+```powershell
 $ taskset -cp 1 `pidof busy`
 pid 29852's current affinity list: 0,1
 pid 29852's new affinity list: 1
@@ -48,7 +48,7 @@ pid 29852's new affinity list: 1
 
 执行完以后发现 CPU 并没有降下来，依然是 200%，这是因为 taskset 从名字也可以看出来，它是对 task 进行设置，而不是对整个进程。通过 ps 也可以看得出来。
 
-```
+```powershell
 $ ps -T -eF | grep busy
 UID        PID  SPID  PPID  C    SZ   RSS PSR STIME TTY          TIME CMD
 ya       29852 29852  5403  0  5725   380   1 22:32 pts/15   00:00:00 ./busy -j2
@@ -62,7 +62,7 @@ ya       29852 29854  5403 60  5725   380   1 22:32 pts/15   00:12:27 ./busy -j2
 如果要对整个进程的所有线程设置 affinity，可以加上 -a 参数。
 
 
-```
+```powershell
 $ taskset -a -cp 1 `pidof busy`
 pid 29852's current affinity list: 0,1
 pid 29852's new affinity list: 1
@@ -74,7 +74,7 @@ pid 29854's new affinity list: 1
 
 此时再次查看 top，busy 进程的 CPU 就下降到 100% 了。
 
-```
+```powershell
 $top
 
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
@@ -88,7 +88,7 @@ $top
 
 通过下面两个函数可以设置和获取线程的 affinity：
 
-```
+```c
 #define _GNU_SOURCE
 #include <sched.h>
 int sched_setaffinity(pid_t pid, size_t len, const cpu_set_t *set);
@@ -97,7 +97,7 @@ int sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *set);
 
 sched_setaffinity 的第一个参数实际是线程 id，size 是第三个 set 参数的字节数，也就是 sizeof(cpu_set_t)。最后一个参数 set 是一个位掩码，数据类型为 cpu_set_t。简单的用法如下所示：
 
-```
+```c
 cpu_set_t mask;
 const size_t size = sizeof(mask);
 CPU_ZERO(&mask);
@@ -122,7 +122,7 @@ Java 中没有提供设置 affinity 的方法，有一个开源项目通过 jni 
 
 我们可以 lscpu 来查看，在我的机器上，它的输出如下：
 
-```
+```powershell
 $ lscpu
 Architecture:        x86_64
 CPU op-mode(s):      32-bit, 64-bit
@@ -152,7 +152,7 @@ NUMA node0 CPU(s):   0-11
 
 这里判断 CPU 是否开启超线程的关键信息是：
 
-```
+```powershell
 Thread(s) per core:  2
 Core(s) per socket:  6
 Socket(s):           1
@@ -165,7 +165,7 @@ CPU(s):              12
 
 在我的云主机上 lscpu 的结果如下：
 
-```
+```powershell
 ubuntu@VM-12-5-ubuntu:~$ lscpu
 Architecture:            x86_64
   CPU op-mode(s):        32-bit, 64-bit
@@ -189,8 +189,8 @@ CPU(s):                  4
 ## 如何知道哪两个逻辑 CPU（超线程）属于一个 CPU
 
 可以 `/sys/devices/system/cpu/cpu{x}/topology/thread_siblings_list` 查看两个超线程是成对的，比如在我的机器上，0 号和 6 号超线程是成对的，1 号和 7 号是成对的。
- 
-```shell
+
+```powershell
 $ cat /sys/devices/system/cpu/cpu0/topology/thread_siblings_list
 0,6
 $ cat /sys/devices/system/cpu/cpu1/topology/thread_siblings_list
@@ -204,5 +204,4 @@ $ cat /sys/devices/system/cpu/cpu2/topology/thread_siblings_list
 这篇文章介绍了 CPU 亲和性和超线程相关的内容。在多核处理器上，CPU 亲和性（CPU affinity）可以显著提高性能。通过将进程或线程绑定到特定的 CPU 核心，可以减少频繁的 TLB 失效，提高地址转换效率。Nginx 和 Java-Thread-Affinity 等工具和库提供了便捷的配置和管理方法。
 
 此外，我们还介绍了超线程相关的知识，超线程技术进一步提升了 CPU 利用率。通过合理配置和使用这些技术，可以显著优化系统性能。
-
 

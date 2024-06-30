@@ -5,7 +5,7 @@
 
 当我们用 GDB 启动一个程序时，实际上这里面涉及两个进程，一个是 GDB 进程，一个是被调试的进程。
 
-<p align=center><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5a98a0ce349547c4b178d212fba1cfa0~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=2179\&h=1699\&s=220114\&e=jpg\&b=fafafa" alt="gdb fork"  width="80%"/></p>
+![](image/gdb2.png)
 
 gdb fork 一个新进程以后调用 exec 系列函数将新程序加载到进程的地址空间，替换 GDB 父进程的栈、数据段等。
 
@@ -78,7 +78,7 @@ if pid == 0 {
 
 接下 GDB 父进程要做到事情，就是启动一个可交互的命令行，类似于下面这样：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dda0434e1e28480fbbf3fcd469cd7828~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1398\&h=216\&s=41986\&e=jpg\&b=000000)
+![](image/gdb3.image)
 
 可以通过这个交互式命令行设置断点、continue 执行、退出等。这个不用我们实现，不同语言下有不同的实现，比如 C/C++ 下有大名鼎鼎的 [linenoise](https://github.com/antirez/linenoise) 。
 
@@ -111,7 +111,7 @@ if pid == 0 {
 
 如果用 ps 或者 top 去看此时的子进程，会发现它处于 `t` 状态。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7b1b5bc6ea304f698a3aabc9e206c1af~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1744\&h=176\&s=64523\&e=jpg\&b=010101)
+![](image/gdb4.image)
 
 可以在 `handle_command` 中模拟处理一下 GDB 的 continue。
 
@@ -134,7 +134,7 @@ X86 系列处理器从第一代就提供了一条专门用来支持调试的指�
 
 加断点不是直接在断点处直接插入 0xCC，而是把断点直接替换为 `0xCC`，同时在 GDB 中记录替换前的指令值是什么，在断点 disable 或者被删掉时，将断点处的内存值恢复回来。
 
-![gdb](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/eb27c5e5fae74c8c99274c17ef99e744~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=3599\&h=1233\&s=621545\&e=jpg\&b=fafafa)
+![gdb](image/gdb5.image)
 
 为了能获取特定地址处的指令值，需要用到 `ptrace(PTRACE_PEEKDATA)`，对应的设置特定地址处的指令值，需要用到 `ptrace(PTRACE_POKEDATA)`。
 
@@ -170,7 +170,7 @@ pub fn disable(&mut self) {
 
 这个过程如下图所示：
 
-![gdb\_2](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/918465069a084f1a924d3c5a002d2b28~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=4574\&h=5095\&s=2144123\&e=jpg\&b=fcfcfc)
+![](image/gdb6.image)
 
 
 
@@ -178,14 +178,18 @@ pub fn disable(&mut self) {
 
 在加断点时，我们一般是针对函数名或者函数行加断点，比如在 main 函数加断点，而不是手动计算出对应的内存地址。
 
-    (gdb) b main
-    Breakpoint 1 at 0x619: file main.c, line 3.
+```powershell
+(gdb) b main
+Breakpoint 1 at 0x619: file main.c, line 3.
+```
 
 GDB 在单步执行时，会输出当前正在执行哪一行。
 
-    (gdb) n
-    hello, world1
-    4	    printf("hello, world2\n");
+```powershell
+(gdb) n
+hello, world1
+4	    printf("hello, world2\n");
+```
 
 对于 GDB 而言，它打交道是是内存地址，它需要一个二进制与源代码直接的桥梁，这个桥梁便是调试符号信息。
 
@@ -193,37 +197,39 @@ DWARF 是一种调试信息格式，被 GCC 在内的很多编译器采用，GCC
 
 通过 dwarfdump 可以查看一个 ELF 文件的 dwarf 信息：
 
-    $ dwarfdump a.out
+```powershell
+$ dwarfdump a.out
 
-    .debug_info
+.debug_info
 
-    // 这部分描述了整个编译单元的信息，对应 main.c 源文件
-    DW_TAG_compile_unit
-        DW_AT_producer              GNU C17 11.1.0 -mtune=generic -march=x86-64 -g -fasynchronous-unwind-tables -fstack-protector-strong
-        DW_AT_language              DW_LANG_C99
-        DW_AT_name                  main.c
-        DW_AT_comp_dir              /data/dev/ya/
-        DW_AT_low_pc                0x00000615
-        DW_AT_high_pc               <offset-from-lowpc>86
+// 这部分描述了整个编译单元的信息，对应 main.c 源文件
+DW_TAG_compile_unit
+    DW_AT_producer              GNU C17 11.1.0 -mtune=generic -march=x86-64 -g -fasynchronous-unwind-tables -fstack-protector-strong
+    DW_AT_language              DW_LANG_C99
+    DW_AT_name                  main.c
+    DW_AT_comp_dir              /data/dev/ya/
+    DW_AT_low_pc                0x00000615
+    DW_AT_high_pc               <offset-from-lowpc>86
 
-    // 这部分描述了一个子程序（在这里是 main 函数）的调试信息                    
-    DW_TAG_subprogram
-      DW_AT_name                  main
-      DW_AT_decl_file             0x00000001 /data/dev/ya/rgdb/main.c
-      DW_AT_low_pc                0x00000615
-      DW_AT_high_pc               <offset-from-lowpc>86
+// 这部分描述了一个子程序（在这里是 main 函数）的调试信息                    
+DW_TAG_subprogram
+  DW_AT_name                  main
+  DW_AT_decl_file             0x00000001 /data/dev/ya/rgdb/main.c
+  DW_AT_low_pc                0x00000615
+  DW_AT_high_pc               <offset-from-lowpc>86
 
-    // 这部分显示的是源代码行号信息。每一行代表源代码中的一个位置，与执行的机器指令相对应。
-    .debug_line: line number info for a single cu
-    0x00000615  [   2,12] NS uri: "/data/dev/ya/main.c"
-    0x00000619  [   3, 5] NS
-    0x00000628  [   4, 5] NS
-    0x00000637  [   5, 5] NS
-    0x00000646  [   6, 5] NS
-    0x00000655  [   7, 5] NS
-    0x00000664  [   8,12] NS
-    0x00000669  [   9, 1] NS
-    0x0000066b  [   9, 1] NS ET  
+// 这部分显示的是源代码行号信息。每一行代表源代码中的一个位置，与执行的机器指令相对应。
+.debug_line: line number info for a single cu
+0x00000615  [   2,12] NS uri: "/data/dev/ya/main.c"
+0x00000619  [   3, 5] NS
+0x00000628  [   4, 5] NS
+0x00000637  [   5, 5] NS
+0x00000646  [   6, 5] NS
+0x00000655  [   7, 5] NS
+0x00000664  [   8,12] NS
+0x00000669  [   9, 1] NS
+0x0000066b  [   9, 1] NS ET  
+```
 
 通过 DWARF 可以获取下面这些信息：
 
@@ -264,7 +270,7 @@ pub fn wait_for_signal(&self) {
 
 过程如下图所示：
 
-![gdb2](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/d20fff569f4c476b97ee1433582ff487~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=4574\&h=5095\&s=2364846\&e=jpg\&b=fcfcfc)
+![](image/gdb7.image)
 
 
 
@@ -307,7 +313,7 @@ loop {
 
 那怎么获取函数的 return 地址呢？在 x86-64 体系下，RBP 指向栈帧的底部，向上获取返回地址，向下获取函数的局部变量。
 
-![gdb3](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/cdfe5162140f4e1fbb5f0de5d50677f8~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=2720\&h=2079\&s=407529\&e=jpg\&b=ffffff)
+![](image/gdb8.image)
 
 这样我们在当前栈帧的返回地址处加一个断点，就可以实现跳出当前函数的功能。
 

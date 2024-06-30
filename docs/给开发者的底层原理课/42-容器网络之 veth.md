@@ -2,11 +2,13 @@ Veth（Virtual Ethernet）设备是 Linux 内核中一种特殊的虚拟网络�
 
 在 linux 下可以使用 ip 命令来创建和管理 veth 设备对。
 
-    ip link add veth0 type veth peer name veth1
-    ip addr add dev veth0 10.0.4.100/24
-    ip addr add dev veth1 10.0.4.101/24
-    ip link set veth0 up
-    ip link set veth1 up
+```powershell
+ip link add veth0 type veth peer name veth1
+ip addr add dev veth0 10.0.4.100/24
+ip addr add dev veth1 10.0.4.101/24
+ip link set veth0 up
+ip link set veth1 up
+```
 
 以上命令创建了一对 Veth 设备 veth0 和 veth1，并给它们配置了 IP 地址，最后将设备状态设为 UP。
 
@@ -77,7 +79,7 @@ static inline void *netdev_priv(const struct net_device *dev)
 
 内存布局如下图所示：
 
-![netdev](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/4c1c9d35978b4f088a5c1016129f898f~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1583\&h=2212\&s=118207\&e=png\&b=fceee8)
+![netdev](image/container19.png)
 
 ## Veth 设备
 
@@ -90,7 +92,7 @@ struct veth_priv {
 };
 ```
 
-![netdev2](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/8cb5745a34cc4e5e8660ce4d453eea30~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=3541\&h=2016\&s=215295\&e=png\&b=fbfbfb)
+![netdev2](image/container20.png)
 
 ## 创建 Veth 设备对
 

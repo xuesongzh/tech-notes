@@ -75,17 +75,19 @@ int main(int argc, char *argv[]) {
 
 ## 从 strace 看 dns 处理的过程
 
-    48 openat(AT_FDCWD, "/etc/nsswitch.conf", O_RDONLY|O_CLOEXEC) = 3
-    54 openat(AT_FDCWD, "/etc/host.conf", O_RDONLY|O_CLOEXEC) = 3
-    59 openat(AT_FDCWD, "/etc/resolv.conf", O_RDONLY|O_CLOEXEC) = 3
-    127 socket(AF_INET, SOCK_DGRAM|SOCK_CLOEXEC|SOCK_NONBLOCK, IPPROTO_IP) = 3
-    128 connect(3, {sa_family=AF_INET, sin_port=htons(53), sin_addr=inet_addr("127.0.0.53")}, 16) = 0
-    131 sendmmsg(3, [{msg_hdr={msg_name=NULL, msg_namelen=0, msg_iov=[{iov_base="\210\252\1\0\0\1\0\0\0\0\0\0\3www\6google\3com\0\0\1\0\    1", iov_len=32}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, msg_len=32}, {msg_hdr={msg_name=NULL, msg_namelen=0, msg_iov=[{i    ov_base="\221\274\1\0\0\1\0\0\0\0\0\0\3www\6google\3com\0\0\34\0\1", iov_len=32}], msg_iovlen=1, msg_controllen=0, msg_flags=0},     msg_len=32}], 2, MSG_NOSIGNAL) = 2
-    132 poll([{fd=3, events=POLLIN}], 1, 5000)  = 1 ([{fd=3, revents=POLLIN}])
-    133 ioctl(3, FIONREAD, [48])                = 0
-    134 recvfrom(3, "\210\252\201\200\0\1\0\1\0\0\0\0\3www\6google\3com\0\0\1\0\1"..., 2048, 0, {sa_family=AF_INET, sin_port=htons(53),     sin_addr=inet_addr("127.0.0.53")}, [28->16]) = 48
-    138 recvfrom(3, "\221\274\201\200\0\1\0\1\0\0\0\0\3www\6google\3com\0\0\34\0\1"..., 65536, 0, {sa_family=AF_INET, sin_port=htons(53)    , sin_addr=inet_addr("127.0.0.53")}, [28->16]) = 60
-    139 close(3)
+```powershell
+48 openat(AT_FDCWD, "/etc/nsswitch.conf", O_RDONLY|O_CLOEXEC) = 3
+54 openat(AT_FDCWD, "/etc/host.conf", O_RDONLY|O_CLOEXEC) = 3
+59 openat(AT_FDCWD, "/etc/resolv.conf", O_RDONLY|O_CLOEXEC) = 3
+127 socket(AF_INET, SOCK_DGRAM|SOCK_CLOEXEC|SOCK_NONBLOCK, IPPROTO_IP) = 3
+128 connect(3, {sa_family=AF_INET, sin_port=htons(53), sin_addr=inet_addr("127.0.0.53")}, 16) = 0
+131 sendmmsg(3, [{msg_hdr={msg_name=NULL, msg_namelen=0, msg_iov=[{iov_base="\210\252\1\0\0\1\0\0\0\0\0\0\3www\6google\3com\0\0\1\0\    1", iov_len=32}], msg_iovlen=1, msg_controllen=0, msg_flags=0}, msg_len=32}, {msg_hdr={msg_name=NULL, msg_namelen=0, msg_iov=[{i    ov_base="\221\274\1\0\0\1\0\0\0\0\0\0\3www\6google\3com\0\0\34\0\1", iov_len=32}], msg_iovlen=1, msg_controllen=0, msg_flags=0},     msg_len=32}], 2, MSG_NOSIGNAL) = 2
+132 poll([{fd=3, events=POLLIN}], 1, 5000)  = 1 ([{fd=3, revents=POLLIN}])
+133 ioctl(3, FIONREAD, [48])                = 0
+134 recvfrom(3, "\210\252\201\200\0\1\0\1\0\0\0\0\3www\6google\3com\0\0\1\0\1"..., 2048, 0, {sa_family=AF_INET, sin_port=htons(53),     sin_addr=inet_addr("127.0.0.53")}, [28->16]) = 48
+138 recvfrom(3, "\221\274\201\200\0\1\0\1\0\0\0\0\3www\6google\3com\0\0\34\0\1"..., 65536, 0, {sa_family=AF_INET, sin_port=htons(53)    , sin_addr=inet_addr("127.0.0.53")}, [28->16]) = 60
+139 close(3)
+```
 
 可以看到它首先读取了
 
@@ -94,8 +96,10 @@ int main(int argc, char *argv[]) {
 nsswitch 是 Name Service Switch 的缩写，在 linux 中 `/etc/nsswitch.conf` 用来配置各种 Name Service 的查询源和查询顺序，以
 host 为例，我们可以通过这个文件来配置指定是先从本地文件还是先从 dns 服务器获取域名解析结果。比如下面这个配置指定了系统解析主机名的顺序和方式：
 
-    #hosts:     db files nisplus nis dns
-    hosts:      files dns myhostname
+```powershell
+#hosts:     db files nisplus nis dns
+hosts:      files dns myhostname
+```
 
 *   files: 先从本地 host 文件（/etc/hosts）查找
 *   dns: 如果在 /etc/hosts 文件中没有找到相应的条目，系统将使用 DNS (域名系统) 来解析主机名
@@ -114,7 +118,7 @@ nsswitch.conf 文件的内容一般不需要我们手动去配置，按这个默
 
 一个常见的 k8s 容器内的 /etc/resolv.conf 内容如下：
 
-```shell
+```powershell
 $ cat /etc/resolv.conf
 
 search pro.svc.cluster.local svc.cluster.local cluster.local
@@ -140,7 +144,7 @@ ndots 的设置主要是为了提高域名解析的效率和准确性,决定是�
 
 我们来做一下实验，配置如下
 
-```shell
+```powershell
 $ cat /etc/resolv.conf
 
 search pro.svc.cluster.local svc.cluster.local cluster.local
@@ -157,7 +161,7 @@ $ sudo tshark -i lo -Y "udp.port==53 or udp.port==5353"
 *   a.b.c.d.svc.cluster.local
 *   a.b.c.d.cluster.local
 
-![img.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/783143fbac57407a84cb8f665d186b06~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1492\&h=336\&s=161354\&e=png\&b=020202)
+![img.png](image/dns.png)
 
 这个时候我们来 ping 一个短一点的域名 `baidu.com`（ndots 小于 2）
 
@@ -166,7 +170,7 @@ $ sudo tshark -i lo -Y "udp.port==53 or udp.port==5353"
 *   baidu.com.cluster.local
 *   baidu.com
 
-![img.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/8a2d0d169b29402c84f533d8fc33b8f1~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1511\&h=328\&s=183722\&e=png\&b=030303)
+![img.png](image/dns2.png)
 
 Netty 中关于 dns ndots 的处理逻辑也是这样，核心的代码在 `io/netty/resolver/dns/DnsResolveContext.java` 的 resolve 函数中：
 
@@ -235,7 +239,7 @@ Node.js 宣称天然是异步的，但是它却是直接使用了 libc 的接口
 libuv 是一个跨平台、高性能、事件驱动的 IO，起初是专为 Node.js 设计的，提供了跨平台的文件 I/O 和线程功能。
 
 它的主要模块如下。
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/295123131300473fb1845471faba16b2~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1020\&h=493\&s=126520\&e=jpg\&b=f3f3f3)
+![](image/dns3.png)
 
 通过这个图可以看到 libuv 对于网络事件的处理和文件 IO、DNS 的处理是不一样。DNS 的处理使用的是线程池，具体的逻辑后面会介绍。
 
@@ -374,7 +378,7 @@ static unsigned int slow_work_thread_threshold(void) {
 
 下面是一个正在解析域名的 Node.js 线程堆栈截图：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7239714f602046b19bf5ab2eee5a4008~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=2086\&h=1470\&s=969120\&e=jpg\&b=313a43)
+![](image/dns4.png)
 
 我们之前遇到过一个实际的案例，大家可以看这篇更详细的文章：<https://juejin.cn/post/7158654267824275470>
 
@@ -412,25 +416,29 @@ static unsigned int slow_work_thread_threshold(void) {
 
 下面是一个持续请求 [www.baidu.com](http://www.baidu.com) 域名的 java 程序的 dns 抓包请求
 
-    import java.net.InetAddress;
-    import java.net.UnknownHostException;
+```java
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
-    public class DnsJava3 {
-        public static void main(String[] args) throws UnknownHostException, InterruptedException {
-            String addrArg = args[0];
+public class DnsJava3 {
+    public static void main(String[] args) throws UnknownHostException, InterruptedException {
+        String addrArg = args[0];
 
-            while (true) {
-                InetAddress[] addresses = InetAddress.getAllByName(addrArg);
-                Thread.sleep(100);
-            }
+        while (true) {
+            InetAddress[] addresses = InetAddress.getAllByName(addrArg);
+            Thread.sleep(100);
         }
     }
+}
+```
 
 
-    $ java -cp . DnsJava3 www.baidu.com
+```powershell
+$ java -cp . DnsJava3 www.baidu.com
+```
 
 可以看到每个 30s 才会对域名重新解析。
-![img.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/938777d248d54aa889af834631e748bb~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1137\&h=555\&s=256730\&e=png\&b=050505)
+![img.png](image/dns5.png)
 
 手动修改 sun.net.inetaddr.ttl 参数为 3s，再次运行上面的程序
 
@@ -438,7 +446,7 @@ static unsigned int slow_work_thread_threshold(void) {
 
 可以看到此时每隔 3 s会对域名重新解析。
 
-![img.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/388305f97d0b4008bcf0ba57b17f3bad~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1278\&h=664\&s=331574\&e=png\&b=030303)
+![img.png](image/dns6.png)
 
 除了应用层的缓存，很多系统也引入了本地DNS缓存服务,如nscd、dnsmasq等,让多个应用程序共享DNS查询结果,减少对上游服务器的压力。
 
@@ -582,60 +590,66 @@ func (c *conf) hostLookupOrder(r *Resolver, hostname string) (ret hostLookupOrde
 
 下面是在没有 single-request 和 single-request-reopen 配置的情况下
 
-    $ cat /etc/resolv.conf
-    nameserver 127.0.0.1
-    options ndots:2 attempts:1
+```powershell
+$ cat /etc/resolv.conf
+nameserver 127.0.0.1
+options ndots:2 attempts:1
 
-    $ curl http://test.ya.me:8080/index.html
+$ curl http://test.ya.me:8080/index.html
 
-    $ sudo tcpdump -i any udp port 53 -nn
+$ sudo tcpdump -i any udp port 53 -nn
 
-    18:49:19.622957 IP 127.0.0.1.57986 > 127.0.0.1.53: 6394+ A? test.ya.me. (28)
-    18:49:19.622988 IP 127.0.0.1.57986 > 127.0.0.1.53: 8961+ AAAA? test.ya.me. (28)
-    18:49:20.623543 IP 127.0.0.1.53 > 127.0.0.1.57986: 6394*- 1/0/0 A 127.0.0.1 (54)
-    18:49:22.623876 IP 127.0.0.1.53 > 127.0.0.1.57986: 8961 ServFail*- 0/0/0 (28)
+18:49:19.622957 IP 127.0.0.1.57986 > 127.0.0.1.53: 6394+ A? test.ya.me. (28)
+18:49:19.622988 IP 127.0.0.1.57986 > 127.0.0.1.53: 8961+ AAAA? test.ya.me. (28)
+18:49:20.623543 IP 127.0.0.1.53 > 127.0.0.1.57986: 6394*- 1/0/0 A 127.0.0.1 (54)
+18:49:22.623876 IP 127.0.0.1.53 > 127.0.0.1.57986: 8961 ServFail*- 0/0/0 (28)
+```
 
 可以看到此时glibc 使用同一个端口，并行发起 A 和 AAAA 记录请求。
 
 下面是 single-request 配置下的抓包结果：
 
-    $ cat /etc/resolv.conf
-    nameserver 127.0.0.1
-    options ndots:2  single-request attempts:1
+```powershell
+$ cat /etc/resolv.conf
+nameserver 127.0.0.1
+options ndots:2  single-request attempts:1
 
-    $ curl http://test.ya.me:8080/index.html
+$ curl http://test.ya.me:8080/index.html
 
-    $ sudo tcpdump -i any udp port 53 -nn
+$ sudo tcpdump -i any udp port 53 -nn
 
-    17:57:33.894391 IP 127.0.0.1.39119 > 127.0.0.1.53: 57602+ A? test.ya.me. (28)
-    17:57:34.895832 IP 127.0.0.1.53 > 127.0.0.1.39119: 57602*- 1/0/0 A 127.0.0.1 (54)
-    17:57:34.896032 IP 127.0.0.1.39119 > 127.0.0.1.53: 51208+ AAAA? test.ya.me. (28)
-    17:57:37.897355 IP 127.0.0.1.53 > 127.0.0.1.39119: 51208 ServFail*- 0/0/0 (28)
+17:57:33.894391 IP 127.0.0.1.39119 > 127.0.0.1.53: 57602+ A? test.ya.me. (28)
+17:57:34.895832 IP 127.0.0.1.53 > 127.0.0.1.39119: 57602*- 1/0/0 A 127.0.0.1 (54)
+17:57:34.896032 IP 127.0.0.1.39119 > 127.0.0.1.53: 51208+ AAAA? test.ya.me. (28)
+17:57:37.897355 IP 127.0.0.1.53 > 127.0.0.1.39119: 51208 ServFail*- 0/0/0 (28)
+```
 
 可以看到在 single-request 下，glibc 使用了相同的端口，串行发送 A 和 AAAA 记录。
 
 下面是 single-request-reopen 配置下的抓包结果：
 
-    $ cat /etc/resolv.conf
-    nameserver 127.0.0.1
-    options ndots:2  single-request-reopen attempts:1
+```powershell
+$ cat /etc/resolv.conf
+nameserver 127.0.0.1
+options ndots:2  single-request-reopen attempts:1
 
-    $ curl http://test.ya.me:8080/index.html
+$ curl http://test.ya.me:8080/index.html
 
-    $ sudo tcpdump -i any udp port 53 -nn
+$ sudo tcpdump -i any udp port 53 -nn
 
-    18:04:46.283105 IP 127.0.0.1.51892 > 127.0.0.1.53: 14609+ A? test.ya.me. (28)
-    18:04:47.284042 IP 127.0.0.1.53 > 127.0.0.1.51892: 14609*- 1/0/0 A 127.0.0.1 (54)
-    18:04:47.284304 IP 127.0.0.1.59491 > 127.0.0.1.53: 13335+ AAAA? test.ya.me. (28)
-    18:04:50.285343 IP 127.0.0.1.53 > 127.0.0.1.59491: 13335 ServFail*- 0/0/0 (28)
+18:04:46.283105 IP 127.0.0.1.51892 > 127.0.0.1.53: 14609+ A? test.ya.me. (28)
+18:04:47.284042 IP 127.0.0.1.53 > 127.0.0.1.51892: 14609*- 1/0/0 A 127.0.0.1 (54)
+18:04:47.284304 IP 127.0.0.1.59491 > 127.0.0.1.53: 13335+ AAAA? test.ya.me. (28)
+18:04:50.285343 IP 127.0.0.1.53 > 127.0.0.1.59491: 13335 ServFail*- 0/0/0 (28)
+```
 
 可以看到在 single-request-reopen 下，glibc 使用了不同的端口，串行发送 A 和 AAAA 记录。
 
-| 配置                    | 是否用同一个端口 | 并发/串行查询 A 和 AAAA |
-| --------------------- | -------- | ---------------- |
-| default               | 是        | 并发               |
-| single-request        | 是        | 串行               |
-| single-request-reopen | 否        | 串行               |
+| 配置                  | 是否用同一个端口 | 并发/串行查询 A 和 AAAA |
+| --------------------- | ---------------- | ----------------------- |
+| default               | 是               | 并发                    |
+| single-request        | 是               | 串行                    |
+| single-request-reopen | 否               | 串行                    |
 
 可能你会好奇为什么这两个配置有什么必要。这与 conntrack 有关。当glibc这样的客户端通过同一个UDP套接字并行发送A(IPv4)
 和AAAA(IPv6) DNS查询时:
@@ -668,7 +682,7 @@ coredns 插件的方式，顺便介绍 coredns 插件的用法。这里我们要
 
 首先我们需要先拉取 coredns 的代码，然后 build，不出意外应该可以可以编译出可执行 coredns 文件。
 
-```shell
+```powershell
 $ wget https://github.com/coredns/coredns/archive/refs/tags/v1.11.1.tar.gz
 $ tar -xzvf v1.11.1.tar.gz
 $ cd coredns-1.11.1
@@ -677,142 +691,164 @@ $ go build
 
 接下来我们来修改 plugin.cfg，新增 myhack
 
-    $ vim plugin.cfg
+```powershell
+$ vim plugin.cfg
+```
 
-![img.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/677016e22f0a413183b7d790f33489ed~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=402\&h=253\&s=33504\&e=png\&b=161616)
+![img.png](image/dns7.png)
 
 然后在 plugin 目录新增 myhack 的代码
 
-    » tree plugin/myhack
-    plugin/myhack
-    └── myhack.go
+```powershell
+» tree plugin/myhack
+plugin/myhack
+└── myhack.go
+```
 
 <!---->
 
-    package myhack
+```go
+package myhack
 
-    import (
-    	"context"
-    	"github.com/coredns/caddy"
-    	"github.com/coredns/coredns/core/dnsserver"
-    	"github.com/coredns/coredns/plugin"
-    	"github.com/coredns/coredns/request"
-    	"github.com/miekg/dns"
-    	"time"
-    )
+import (
+	"context"
+	"github.com/coredns/caddy"
+	"github.com/coredns/coredns/core/dnsserver"
+	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/request"
+	"github.com/miekg/dns"
+	"time"
+)
 
-    type MyHack struct {
-    	Next plugin.Handler
-    }
+type MyHack struct {
+	Next plugin.Handler
+}
 
-    func (e MyHack) Name() string { return "myhack" }
+func (e MyHack) Name() string { return "myhack" }
 
-    func (e MyHack) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-    	state := request.Request{W: w, Req: r}
-    	a := new(dns.Msg)
-    	a.SetReply(r)
-    	a.Authoritative = true
+func (e MyHack) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+	state := request.Request{W: w, Req: r}
+	a := new(dns.Msg)
+	a.SetReply(r)
+	a.Authoritative = true
 
-    	if state.QType() == dns.TypeAAAA && state.Name() == "test.ya.me." {
-    		a.Rcode = dns.RcodeServerFailure
-    		time.Sleep(3 * time.Second)
-            w.WriteMsg(a)
-            return dns.RcodeSuccess, nil
-    	} else if state.QType() == dns.TypeA && state.Name() == "test.ya.me." {
-    		time.Sleep(1 * time.Second)
-    		plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
-    		return dns.RcodeSuccess, nil
-    	} else {
-    		plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
-    		return dns.RcodeSuccess, nil
-    	}
+	if state.QType() == dns.TypeAAAA && state.Name() == "test.ya.me." {
+		a.Rcode = dns.RcodeServerFailure
+		time.Sleep(3 * time.Second)
+        w.WriteMsg(a)
+        return dns.RcodeSuccess, nil
+	} else if state.QType() == dns.TypeA && state.Name() == "test.ya.me." {
+		time.Sleep(1 * time.Second)
+		plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
+		return dns.RcodeSuccess, nil
+	} else {
+		plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
+		return dns.RcodeSuccess, nil
+	}
 
-    }
+}
 
-    func (e MyHack) Ready() bool { return true }
+func (e MyHack) Ready() bool { return true }
 
-    func init() {
-    	plugin.Register("myhack", func(c *caddy.Controller) error {
-    		dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
-    			return MyHack{Next: next}
-    		})
-    		return nil
-    	})
-    }
+func init() {
+	plugin.Register("myhack", func(c *caddy.Controller) error {
+		dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
+			return MyHack{Next: next}
+		})
+		return nil
+	})
+}
+```
 
 然后就可以执行 go generate 和 go build 重新编译 CoreDNS，在编译参数中加入 myhack 插件
 
-    go generate
-    go build
+```powershell
+go generate
+go build
+```
 
 在 Corefile 中引入该插件
 
-     » cat Corefile
-    .:53 {
-    	hosts {
-    		127.0.0.1 test.ya.me
-    	}
-    	errors
-    	log
-    	myhack
-    	forward . 8.8.8.8
-    }
+```powershell
+ » cat Corefile
+.:53 {
+	hosts {
+		127.0.0.1 test.ya.me
+	}
+	errors
+	log
+	myhack
+	forward . 8.8.8.8
+}
+```
 
 然后运行 coredns
 
-    sudo ./coredns -conf  ./Corefile
+```powershell
+sudo ./coredns -conf  ./Corefile
+```
 
 这样就通过自定义一个 myhack 插件，拦截了对 test.ya.me AAAA 记录的查询，delay 了 3s，并返回了 SERVFAIL 状态码。对其他查询则照常处理。
 
 我们来实测一下，先来看下 curl 的表现
 
-    » curl -w "time cost:\n\                                                                                                        130 ↵
-    connect: %{time_connect}\n\
-    DNS: %{time_namelookup}\n\
-    redirect: %{time_redirect}\n\
-    start_transfer: %{time_starttransfer}\n\
-    time_total : %{time_total}\n" http://test.ya.me:8080/index.html
+```powershell
+» curl -w "time cost:\n\                                                                                                        130 ↵
+connect: %{time_connect}\n\
+DNS: %{time_namelookup}\n\
+redirect: %{time_redirect}\n\
+start_transfer: %{time_starttransfer}\n\
+time_total : %{time_total}\n" http://test.ya.me:8080/index.html
+```
 
 
-    time cost:
-    connect: 3.513601
-    DNS: 3.513321
-    redirect: 0.000000
-    start_transfer: 3.520263
-    time_total : 3.520334
+```powershell
+time cost:
+connect: 3.513601
+DNS: 3.513321
+redirect: 0.000000
+start_transfer: 3.520263
+time_total : 3.520334
+```
 
 从 curl 结果可以看到 DNS 总共花了 3s 多才返回，请求的大部分时间都花在了 DNS 解析上。通过抓包可以同步确认 A 和 AAAA
 同时发起请求，然后 3s 之后返回了 SERVFAIL，而且 A 和 AAAA 记录请求使用的同一个端口 51640
 
-    17:27:09.683761 IP 127.0.0.1.51640 > 127.0.0.1.53: 11238+ A? test.ya.me. (28)
-    17:27:09.683803 IP 127.0.0.1.51640 > 127.0.0.1.53: 14317+ AAAA? test.ya.me. (28)
-    17:27:10.684291 IP 127.0.0.1.53 > 127.0.0.1.51640: 11238*- 1/0/0 A 127.0.0.1 (54)
-    17:27:12.684989 IP 127.0.0.1.53 > 127.0.0.1.51640: 14317 ServFail*- 0/0/0 (28)
+```powershell
+17:27:09.683761 IP 127.0.0.1.51640 > 127.0.0.1.53: 11238+ A? test.ya.me. (28)
+17:27:09.683803 IP 127.0.0.1.51640 > 127.0.0.1.53: 14317+ AAAA? test.ya.me. (28)
+17:27:10.684291 IP 127.0.0.1.53 > 127.0.0.1.51640: 11238*- 1/0/0 A 127.0.0.1 (54)
+17:27:12.684989 IP 127.0.0.1.53 > 127.0.0.1.51640: 14317 ServFail*- 0/0/0 (28)
+```
 
 在 single-request-reopen 参数启动的情况下：
 
-    $ curl -w "time cost:\n\                                                                                               
-    connect: %{time_connect}\n\
-    DNS: %{time_namelookup}\n\
-    redirect: %{time_redirect}\n\
-    start_transfer: %{time_starttransfer}\n\
-    time_total : %{time_total}\n" http://test.ya.me:8080/index.html
+```powershell
+$ curl -w "time cost:\n\                                                                                               
+connect: %{time_connect}\n\
+DNS: %{time_namelookup}\n\
+redirect: %{time_redirect}\n\
+start_transfer: %{time_starttransfer}\n\
+time_total : %{time_total}\n" http://test.ya.me:8080/index.html
 
-    time cost:
-    connect: 4.514744
-    DNS: 4.514463
-    redirect: 0.000000
-    start_transfer: 4.519724
-    time_total : 4.519795
+time cost:
+connect: 4.514744
+DNS: 4.514463
+redirect: 0.000000
+start_transfer: 4.519724
+time_total : 4.519795
+```
 
 single-request-reopen 开启的情况下，A 和 AAAA 请求变为了串行请求，从 curl 结果可以看到 DNS 总共花了 4s 多才返回，请求的大部分时间都花在了
 DNS 解析上， 通过抓包可以同步确认 A 记录在 1s
 后返回，随即发起了 AAAA 请求，然后 3s 之后返回了 SERVFAIL。而且 A 和 AAAA 记录请求使用的不同的端口 47216 和 53798
 
-    17:01:38.628275 IP 127.0.0.1.47216 > 127.0.0.1.53: 25909+ A? test.ya.me. (28)
-    17:01:39.629133 IP 127.0.0.1.53 > 127.0.0.1.47216: 25909*- 1/0/0 A 127.0.0.1 (54)
-    17:01:39.629438 IP 127.0.0.1.53798 > 127.0.0.1.53: 20027+ AAAA? test.ya.me. (28)
-    17:01:42.630356 IP 127.0.0.1.53 > 127.0.0.1.53798: 20027 ServFail*- 0/0/0 (28)
+```powershell
+17:01:38.628275 IP 127.0.0.1.47216 > 127.0.0.1.53: 25909+ A? test.ya.me. (28)
+17:01:39.629133 IP 127.0.0.1.53 > 127.0.0.1.47216: 25909*- 1/0/0 A 127.0.0.1 (54)
+17:01:39.629438 IP 127.0.0.1.53798 > 127.0.0.1.53: 20027+ AAAA? test.ya.me. (28)
+17:01:42.630356 IP 127.0.0.1.53 > 127.0.0.1.53798: 20027 ServFail*- 0/0/0 (28)
+```
 
 我们来看看 go 程序的行为：
 
@@ -847,30 +883,36 @@ func main() {
 
 通过抓包可以同步确认 A 和 AAAA 同时发起请求，然后 3s 之后返回了 SERVFAIL，与 glibc 的实现不同的是，A 和 AAAA 记录请求使用的是不同的端口。
 
-    17:35:17.167091 IP 127.0.0.1.39336 > 127.0.0.1.53: 60722+ [1au] AAAA? test.ya.me. (39)
-    17:35:17.167142 IP 127.0.0.1.53841 > 127.0.0.1.53: 21045+ [1au] A? test.ya.me. (39)
-    17:35:18.167474 IP 127.0.0.1.53 > 127.0.0.1.53841: 21045*- 1/0/1 A 127.0.0.1 (65)
-    17:35:20.168024 IP 127.0.0.1.53 > 127.0.0.1.39336: 60722 ServFail*- 0/0/1 (39)
+```powershell
+17:35:17.167091 IP 127.0.0.1.39336 > 127.0.0.1.53: 60722+ [1au] AAAA? test.ya.me. (39)
+17:35:17.167142 IP 127.0.0.1.53841 > 127.0.0.1.53: 21045+ [1au] A? test.ya.me. (39)
+17:35:18.167474 IP 127.0.0.1.53 > 127.0.0.1.53841: 21045*- 1/0/1 A 127.0.0.1 (65)
+17:35:20.168024 IP 127.0.0.1.53 > 127.0.0.1.39336: 60722 ServFail*- 0/0/1 (39)
+```
 
 在 single-request-reopen 开启的情况下，花了 4s 多这个请求才返回
 
-    » time go run DnsGo2.go
-    Status: 404 Not Found
-    Header: map[Connection:[keep-alive] Content-Length:[0] Date:[Mon, 22 Apr 2024 09:04:21 GMT] Server:[ecstatic-3.3.2]]
+```powershell
+» time go run DnsGo2.go
+Status: 404 Not Found
+Header: map[Connection:[keep-alive] Content-Length:[0] Date:[Mon, 22 Apr 2024 09:04:21 GMT] Server:[ecstatic-3.3.2]]
 
-    go run DnsGo2.go  0.29s user 0.14s system 10% cpu 4.213 total
+go run DnsGo2.go  0.29s user 0.14s system 10% cpu 4.213 total
+```
 
 从抓包也可以确定在 single-request-reopen 的情况下 go 也是按顺序请求 A 和 AAAA 记录。
 
-    17:04:17.142554 IP 127.0.0.1.41331 > 127.0.0.1.53: 10953+ [1au] A? test.ya.me. (39)
-    17:04:18.143980 IP 127.0.0.1.53 > 127.0.0.1.41331: 10953*- 1/0/1 A 127.0.0.1 (65)
-    17:04:18.144530 IP 127.0.0.1.38270 > 127.0.0.1.53: 47188+ [1au] AAAA? test.ya.me. (39)
-    17:04:21.145302 IP 127.0.0.1.53 > 127.0.0.1.38270: 47188 ServFail*- 0/0/1 (39)
+```powershell
+17:04:17.142554 IP 127.0.0.1.41331 > 127.0.0.1.53: 10953+ [1au] A? test.ya.me. (39)
+17:04:18.143980 IP 127.0.0.1.53 > 127.0.0.1.41331: 10953*- 1/0/1 A 127.0.0.1 (65)
+17:04:18.144530 IP 127.0.0.1.38270 > 127.0.0.1.53: 47188+ [1au] AAAA? test.ya.me. (39)
+17:04:21.145302 IP 127.0.0.1.53 > 127.0.0.1.38270: 47188 ServFail*- 0/0/1 (39)
+```
 
 这部分源码逻辑在 `src/net/dnsclient_unix.go`中
 
-![img.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dc77d3cbe3af4e559d68e557b49e1813~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1075\&h=660\&s=176563\&e=png\&b=1f2023)
+![img.png](image/dns8.png)
 
 Go 中把 single-request 和 single-request-reopen 都统一当做了 single-request。
 
-![img.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/4e624627b5f946bd8ac59db6f68d9d2b~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=900\&h=257\&s=68984\&e=png\&b=1f2124)
+![img.png](image/dns9.png)

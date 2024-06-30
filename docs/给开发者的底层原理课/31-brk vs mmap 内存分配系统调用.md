@@ -5,16 +5,16 @@
 
 虚拟内存中，堆段开始的位置用一个称为 brk（program break）的指针来标识。在地址空间分布随机化（Address Space Layout Randomization，ASLR）关闭的情形下，数据段结束的位置和堆段开始的位置相同。在 ASLR 开启的情况下，堆段开始的位置为数据段结束的位置加上一段随机数。
 
-![](//p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/51990f3fe48348adaedd908d9d05cd63~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/brk.png)
 
 brk 系统调用的名字也是这么来的，使用 malloc 申请 30K 内存，只需要将 brk 指针上抬 30KB 大小即可，前后 brk 指针和堆的申请如下所示：
 
-![](//p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/90101178ff384b2b948752dd5f2bac46~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/brk2.png)
 
 
 brk 系统调用还有一个类似的函数 sbrk，不过它接受的参数不是一个地址，而是地址变化的增量。这两个函数的函数定义如下：
 
-```
+```c
 #include <unistd.h>
 
 int brk(void *addr);
@@ -30,7 +30,7 @@ sbrk 将 program break 在原有地址上增加从参数 increment 传入的大�
 
 不过 sbrk 不是系统调用，可以看到是 brk 系统调用的一个简单封装，sbrk(n) 可以用 brk 简单表示为下面这样：
 
-```
+```c
 void *oldbrk = brk(NULL);
 brk(oldbrk + n)
 ```
@@ -41,7 +41,7 @@ brk(oldbrk + n)
 
 接下面来演示 brk、sbrk 的用法：
 
-```
+```c
 #include <stdio.h>
 #include <unistd.h>
 
@@ -65,14 +65,14 @@ int main() {
 
 编译运行上面的程序，首先会打印当前的 brk 地址 0x602000：
 
-```
+```powershell
 $ ./a.out
 current brk: 0x602000
 ```
 
 使用 /proc/pid/maps 查看当前进程的内存分布如下：
 
-```
+```powershell
 $ cat /proc/`pidof a.out`/maps
 
 00400000-00401000 r-xp 00000000 fd:02 267798                             a.out
@@ -86,27 +86,27 @@ $ cat /proc/`pidof a.out`/maps
 
 接下来键入 enter，此时会调用 brk 申请 8k 内存，终端输出如下所示：
 
-```
+```powershell
 $ ./a.out 
 current brk: 0x602000
 current brk: 0x604000
 ```
 
 内存分布如下：
- 
-```
+
+```powershell
 00400000-00401000 r-xp 00000000 fd:02 267798                             a.out
 00600000-00601000 r--p 00000000 fd:02 267798                             a.out
 00601000-00602000 rw-p 00001000 fd:02 267798                             a.out
 00602000-00604000 rw-p 00000000 00:00 0                                  [heap]
 7ffff7a0d000-7ffff7bd0000 r-xp 00000000 fd:00 393902                     /usr/lib64/libc-2.17.so
 ```
- 
+
 可以看到进程的内存多出了一块起始地址为 0x602000，长度为 8KB 的内存区域。
 
 接下来再次输入 enter，此时会重新调用 brk 回收内存，此时的 program break 又回到了 0x602000，如下所示：
 
-```
+```powershell
 $ ./a.out 
 current brk: 0x602000
 current brk: 0x604000
@@ -115,7 +115,7 @@ current brk: 0x602000
 
 此时内存分布里的已经没有之前申请的 8k 内存区域了。
 
-```
+```powershell
 00400000-00401000 r-xp 00000000 fd:02 267798                             a.out
 00600000-00601000 r--p 00000000 fd:02 267798                             a.out
 00601000-00602000 rw-p 00001000 fd:02 267798                             a.out
@@ -133,7 +133,7 @@ mmap 是在进程的虚拟内存空间分配一块区域作为内存映射。根
 
 mmap 的函数定义如下：
 
-```
+```c
 #include <sys/mman.h>
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
@@ -147,7 +147,7 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 
 mmap 对应的内存释放函数是 munmap，签名如下所示：
 
-```
+```c
 #include <sys/mman.h>
 
 int munmap(void *addr, size_t length);
@@ -159,7 +159,7 @@ int munmap(void *addr, size_t length);
 
 接下来看一个实际的例子：
 
-```
+```c
 #include <stdio.h>
 #include <sys/mman.h>
 
@@ -182,7 +182,7 @@ int main() {
 
 编译运行上面的程序，程序的内存布局如下：
 
-```
+```powershell
 00400000-00401000 r-xp 00000000 fd:02 267798                             a.out
 00600000-00601000 r--p 00000000 fd:02 267798                             a.out
 00601000-00602000 rw-p 00001000 fd:02 267798                             a.out
@@ -191,7 +191,7 @@ int main() {
 
 输入 enter，此时会调用 mmap 进行内存，打印申请内存的首地址。
 
-```
+```powershell
 $ ./a.out
 before mmap
 after mmap, addr: 0x7ffff720d000
@@ -199,7 +199,7 @@ after mmap, addr: 0x7ffff720d000
 
 再次查看内存布局：
 
-```
+```powershell
 00400000-00401000 r-xp 00000000 fd:02 267798                             /home/ya/dev/linux_study/memory/malloc/a.out
 00600000-00601000 r--p 00000000 fd:02 267798                             /home/ya/dev/linux_study/memory/malloc/a.out
 00601000-00602000 rw-p 00001000 fd:02 267798                             /home/ya/dev/linux_study/memory/malloc/a.out
@@ -209,13 +209,13 @@ after mmap, addr: 0x7ffff720d000
 
 可以看到当前多了一块起始地位为 0x7ffff720d000 内存区域，这块长度为 8MB。
 
-```
+```powershell
 0x7ffff7a0d000-0x7ffff720d000 = 8,388,608 = 8MB
 ```
 
 然后继续输入 enter，此时会调用 munmap 解除内存映射。
 
-```
+```powershell
 $ ./a.out
 before mmap
 after mmap, addr: 0x7ffff720d000

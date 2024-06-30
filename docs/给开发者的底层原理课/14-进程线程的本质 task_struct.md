@@ -6,14 +6,14 @@
 
 在 Linux 中，无论进程还是线程，在内核中都叫 task，用结构体 task_struct 来表示，这个结构比较庞大，源码有几百行之多。我摘取了部分字段放在了下面，可以对 task_struct 有一个大致的了解。如下图所示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/51cc3c36fc8444138a9f41ec88994b27~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/task.png)
 
 task_struct 包含了很多有用的信息，比如进程的状态 state、进程 pid、进程打开的文件描述符 files、内存管理结构体指针 mm、进程所属的文件系统信息等。
 
 
 使用 systemtap 可以探究 task_struct 的内部细节，一个简单的模板如下：
 
-```
+```c
 %{
 #include <linux/list.h>
 #include <linux/sched.h>
@@ -39,7 +39,7 @@ probe begin {
 
 task_struct 结构体中的 state 字段表示进程的状态。
 
-```
+```c
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	...
@@ -48,7 +48,7 @@ struct task_struct {
 
 完整的 state 定义在 `include/linux/sched.h` 头文件中。
 
-```
+```c
 #define TASK_RUNNING		0
 #define TASK_INTERRUPTIBLE	1
 #define TASK_UNINTERRUPTIBLE	2
@@ -85,7 +85,7 @@ struct task_struct {
 
 以下面的代码为例：
 
-```
+```c
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -109,13 +109,13 @@ int main() {
 
 编译运行上面这段代码：
 
-```
+```powershell
 $ gcc pid_tgid_test.c -lpthread 
 ```
 
 使用 ps -T 可以查看进程所有的线程，这个例子会有 1 个主线程，4 个子线程。
 
-```
+```powershell
 $ ps -T -e -o pid,tid,state,command
 
   PID   TID S COMMAND
@@ -129,7 +129,7 @@ $ ps -T -e -o pid,tid,state,command
 ps 输出中的 PID 实际上是 task_struct 中 tgid，TID 才是真正 task_struct 中的 pid，如下图所示：
 
 
-![pid_tgid](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/3b233f5ba1c244d5b095cfe1b5a1e96b~tplv-k3u1fbpfcp-zoom-1.image)
+![pid_tgid](image/pid.png)
 
 
 
@@ -137,7 +137,7 @@ ps 输出中的 PID 实际上是 task_struct 中 tgid，TID 才是真正 task_st
 
 task_struct 跟内存管理相关的最重要的字段是 mm。
 
-```
+```c
 struct task_struct {
 	struct mm_struct *mm;
 }
@@ -145,7 +145,7 @@ struct task_struct {
 
 每个进程都有自己独立的虚拟地址空间，使用 mm_struct 结构体来管理内存。这里的 mm 指针指向了 mm_struct 结构体，包含了内存资源的页表、内存映射等，它的部分源码如下：
 
-```
+```c
 struct mm_struct {
 	struct vm_area_struct * mmap;		/* list of VMAs */
 	struct rb_root mm_rb;
@@ -162,7 +162,7 @@ mm_struct 结构体包含了串联起 VMA 的单链表 mmap。为了更快地查
 
 task_struct 中跟文件相关在字段最常用的是下面这两个：
 
-```
+```c
 struct task_struct {
 	struct fs_struct *fs;
 /* open file information */
@@ -175,7 +175,7 @@ task_struct 中的 fs 字段是一个 fs_struct 结构体指针，包含了进�
 
 一个进程启动，系统就默认会分配三个文件描述符，文件描述符 0 表示 stdin 标准输入，文件描述符 1 表示 stdout 标准输出，文件描述符 2 表示 stderr 标准错误输出。后面进程打开文件 fd 从 3 开始分配。以下面的 C 代码为例，使用 open 系统调用打开当前目录的 a.txt 文件，如下所示：
 
-```
+```c
 #include <stdio.h>
 #include <fcntl.h>
 int main() {
@@ -188,7 +188,7 @@ int main() {
 
 运行上面的代码输出结果如下：
 
-```
+```powershell
 $ gcc test.c; ./a.out
 
 fd is 3
@@ -196,7 +196,7 @@ fd is 3
 
 随后使用 `pidof a.out` 查看这个进程的 pid，这里为 28200，在 linux 的 `/proc/<pid>/fd` 目录里记录了进程打开的所有文件句柄，如下所示：
 
-```
+```powershell
 $ ls -l /proc/28200/fd
 
 lrwx------. 1 ya ya 64 Apr 25 21:50 0 -> /dev/pts/2
@@ -211,7 +211,7 @@ lr-x------. 1 ya ya 64 Apr 25 21:50 3 -> /home/ya/dev/tmp/a.txt
 
 task_struct 中 exit_code 表示进程的退出码：
 
-```
+```c
 struct task_struct {
     int exit_code;
 }
@@ -221,12 +221,12 @@ struct task_struct {
 
 进程的退出有很多种原因，有可能进程正常调用 exit 函数退出，也有可能是被信号杀死，exit_code 值的含义如下：
 
-![process-exitcode](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/fc1cb5eb28f748428e6f18e49271df17~tplv-k3u1fbpfcp-zoom-1.image)
+![process-exitcode](image/exit.png)
 
 
 以下面的代码为例：
 
-```
+```c
 #include <unistd.h>
 #include <stdio.h>
 
@@ -247,7 +247,7 @@ int main() {
 
 运行后，fork 的子进程通过调用 exit 函数退出变为僵尸进程。我们来用 systemtap 的脚本来查看这个子进程的 exit_code：
 
-```
+```c
 %{
 #include <linux/list.h>
 #include <linux/sched.h>
@@ -268,7 +268,7 @@ probe begin {
 
 运行这段 systemtap 的脚本：
 
-```
+```powershell
 $ sudo stap -g task_dump.stp
 
 process: a.out, pid: 2005, exit_code: 0x0
@@ -279,7 +279,7 @@ process: a.out, pid: 2006, exit_code: 0x700
 
 接下来稍微修改一下上面的测试程序，让子进程先不退出：
 
-```
+```c
 #include <unistd.h>
 #include <stdio.h>
 
@@ -300,14 +300,14 @@ int main() {
 
 编译运行上面的程序：
 
-```
+```powershell
 parent: 2822
 child: 2823
 ```
 
 然后使用 kill -9 杀掉子进程，再次使用 systemtap 查看进程 exit_code。
 
-```
+```powershell
 $ sudo stap -g task_dump.stp
 
 process: a.out, pid: 2822, exit_code: 0x0

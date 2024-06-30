@@ -9,24 +9,28 @@
 
 来做一个实验，将之前的代码做一些修改。
 
-    #include <stdlib.h>
-    #include <stdio.h>
-    #include <string.h>
-    int main() {
-        char *p = malloc(5 * 1024 * 1024 * 1024L);
-        if (p == NULL) {
-            printf("malloc failed\n");
-        } else {
-            printf("Address of p is: %p\n", p);
-        }
-        getchar();
-        return 0;
+```c
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+int main() {
+    char *p = malloc(5 * 1024 * 1024 * 1024L);
+    if (p == NULL) {
+        printf("malloc failed\n");
+    } else {
+        printf("Address of p is: %p\n", p);
     }
+    getchar();
+    return 0;
+}
+```
 
 编译运行上面的程序，发现 malloc 居然失败了。
 
-    $ gcc malloc_test_01.c;./a.out                                                                                                              
-    malloc failed
+```powershell
+$ gcc malloc_test_01.c;./a.out                                                                                                              
+malloc failed
+```
 
 这就涉及到 Linux 内存分配的 Overcommit 机制，一般来说进程实际使用的内存比申请的内存要小，malloc 申请的内存只有在真正使用的时候才分配，内核参数 vm.overcommit\_memory 用来控制是否允许申请超过当前可用物理内存的行为。
 
@@ -58,13 +62,17 @@ unsigned long vm_commit_limit(void)
 
 sysctl\_overcommit\_kbytes 默认值为 0，会走 else 的逻辑，默认在没有开启 huge pge 的情况下 hugetlb\_total\_pages 函数返回值也为 0，sysctl\_overcommit\_ratio 的默认值为 50，简化过的计算如下：
 
-    CommitLimit = totalram_pages * 0.5 + total_swap_pages;
+```powershell
+CommitLimit = totalram_pages * 0.5 + total_swap_pages;
+```
 
 也就是 CommitLimit 为物理内存的 1/2 加上 SWAP 分区的大小。CommitLimit 的值可以通过查看 /proc/meminfo 文件得到。
 
-    $ cat /proc/meminfo  | grep -i commit
-    CommitLimit:     3004104 kB
-    Committed_AS:     987600 kB
+```powershell
+$ cat /proc/meminfo  | grep -i commit
+CommitLimit:     3004104 kB
+Committed_AS:     987600 kB
+```
 
 ## swap
 
@@ -76,70 +84,86 @@ sysctl\_overcommit\_kbytes 默认值为 0，会走 else 的逻辑，默认在没
 
 swap 可以通过 swapoff 和 swapon 命令关闭和打开。
 
-    swapoff -a
-    swapon -a
+```powershell
+swapoff -a
+swapon -a
+```
 
 除此之外，可以通过 vm.swappiness 参数来选择更倾向于回收文件背景内存页还是匿名内存页，通过 vm.min\_free\_kbytes 参数来调整系统定期回收内存的阈值，这部分内容在后面会单独介绍，这里先不展开。
 
 我们用代码来演示一下匿名内存页的 swap，我的机器的物理内存是 2G，空闲的内存在 1G 多一点。swap 的大小大概是 2G，如下所示：
 
-    $ free -m
-                  total        used        free      shared  buff/cache   available
-    Mem:           1835         474        1216          32         143        1183
-    Swap:          2015           0        2015
+```powershell
+$ free -m
+              total        used        free      shared  buff/cache   available
+Mem:           1835         474        1216          32         143        1183
+Swap:          2015           0        2015
+```
 
 可以看到，这个时候 swap 使用的的大小为 0。
 
 接下来写一个简单的测试程序，如下所示：
 
-    #include <stdlib.h>
-    #include <stdio.h>
-    #include <string.h>
-    #define GB (1024 * 1024 * 1024)
-    int main() {
-        size_t size = 1L * GB;
-        char *p = calloc(1, size);
-        printf("p=%p\n", p);
-        getchar();
-        return 0;
-    }
+```c
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#define GB (1024 * 1024 * 1024)
+int main() {
+    size_t size = 1L * GB;
+    char *p = calloc(1, size);
+    printf("p=%p\n", p);
+    getchar();
+    return 0;
+}
+```
 
 上面的代码申请了 1GB 的内存并将其内存初始化为 0，编译运行上面的代码：
 
-    gcc swap_test.c 
-    ./a.out 
+```powershell
+gcc swap_test.c 
+./a.out 
+```
 
 使用 top 查看内存的占用：
 
-      PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
-    12311 ya        20   0 1028.1m 1.000g   0.3m S   0.0 55.8   0:00.24 a.out
+```powershell
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
+12311 ya        20   0 1028.1m 1.000g   0.3m S   0.0 55.8   0:00.24 a.out
+```
 
 可以看到此时的消耗的物理内存大小是 1G。然后新开一个终端再次执行 a.out ：
 
-      PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
-    12364 ya        20   0 1028.1m 1.000g   0.0m S   0.0 55.8   0:00.79 a.out
-    12311 ya        20   0 1028.1m 522.5m   0.0m S   0.0 28.5   0:00.24 a.out
+```powershell
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
+12364 ya        20   0 1028.1m 1.000g   0.0m S   0.0 55.8   0:00.79 a.out
+12311 ya        20   0 1028.1m 522.5m   0.0m S   0.0 28.5   0:00.24 a.out
+```
 
 可以看到第一个运行的 a.out 内存占用 RES 只有 528.7 M 了，少的这部分内存被 swap 到了交换分区。
 
 再开一个终端执行 a.out，可以看到第一次运行的进程 12311 所有的匿名页全部都被交换出去了，RES 等于 0。
 
-      PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
-    12430 ya        20   0 1028.1m 1.000g   0.1m S   0.0 55.8   0:00.88 a.out
-    12364 ya        20   0 1028.1m 505.4m   0.0m S   0.0 27.5   0:00.79 a.out
-    12311 ya        20   0 1052800      0      0 S   0.0  0.0   0:00.24 a.out
+```powershell
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
+12430 ya        20   0 1028.1m 1.000g   0.1m S   0.0 55.8   0:00.88 a.out
+12364 ya        20   0 1028.1m 505.4m   0.0m S   0.0 27.5   0:00.79 a.out
+12311 ya        20   0 1052800      0      0 S   0.0  0.0   0:00.24 a.out
+```
 
 我们还可以通过 sar 等工具观测 swap 使用变化的的过程，其中 -r 参数表示显示内存使用的情况，-S 表示显示 Swap 使用情况。
 
-    sar -r -S 1
+```powershell
+sar -r -S 1
 
-    07:23:37 AM kbswpfree kbswpused  %swpused  kbswpcad   %swpcad
-    07:23:38 AM   2064380         0      0.00         0      0.00
-    07:23:40 AM   1592240    472140     22.87    196900     41.70
-    07:23:41 AM   1415132    649248     31.45     11688      1.80
-    07:23:53 AM    970236   1094144     53.00     25328      2.31
-    07:23:54 AM    487428   1576952     76.39     51028      3.24
-    07:23:55 AM    284204   1780176     86.23     75988      4.27
+07:23:37 AM kbswpfree kbswpused  %swpused  kbswpcad   %swpcad
+07:23:38 AM   2064380         0      0.00         0      0.00
+07:23:40 AM   1592240    472140     22.87    196900     41.70
+07:23:41 AM   1415132    649248     31.45     11688      1.80
+07:23:53 AM    970236   1094144     53.00     25328      2.31
+07:23:54 AM    487428   1576952     76.39     51028      3.24
+07:23:55 AM    284204   1780176     86.23     75988      4.27
+```
 
 swpused 列表示已经使用的 swap 区域的百分比，可以看到三次 a.out 运行过程中，swap 区域使用在不断增大。
 
@@ -147,52 +171,60 @@ swpused 列表示已经使用的 swap 区域的百分比，可以看到三次 a.
 
 有了上面 overcommit 和 swap 相关的知识，接下来看看 OOM 相关的内容。为了方便，这里关闭了 swap，同时将 overcommit 设置为 1（OVERCOMMIT\_ALWAYS）。
 
-    sysctl -w vm.overcommit_memory=1
-    swapoff -a
+```powershell
+sysctl -w vm.overcommit_memory=1
+swapoff -a
+```
 
 测试程序如下：
 
-    #include <stdlib.h>
-    #include <stdio.h>
-    #include <string.h>
-    #define GB (1024 * 1024 * 1024)
-    #define MB (1024 * 1024)
-    int main() {
-        size_t size = 3L * GB;
-        char *p = malloc(size);
-        if (p == NULL) {
-            printf("%s\n", "malloc failed");
-            return -1;
-        }
-        int i;
-        for (i = 0; i < size; ++i) {
-            if ((i % (100 * MB)) == 0) {
-                printf("written %d MB \n", i / MB);
-            }
-            p[i] = 'a';
-        }
-        getchar();
-        return 0;
+```c
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#define GB (1024 * 1024 * 1024)
+#define MB (1024 * 1024)
+int main() {
+    size_t size = 3L * GB;
+    char *p = malloc(size);
+    if (p == NULL) {
+        printf("%s\n", "malloc failed");
+        return -1;
     }
+    int i;
+    for (i = 0; i < size; ++i) {
+        if ((i % (100 * MB)) == 0) {
+            printf("written %d MB \n", i / MB);
+        }
+        p[i] = 'a';
+    }
+    getchar();
+    return 0;
+}
+```
 
 编译运行上面的程序，输出结果如下所示：
 
-    written 0 MB 
-    written 100 MB 
-    written 200 MB 
-    ...
-    written 1400 MB 
-    written 1500 MB 
-    written 1600 MB 
-    [1]    3219 killed     ./a.out
+```powershell
+written 0 MB 
+written 100 MB 
+written 200 MB 
+...
+written 1400 MB 
+written 1500 MB 
+written 1600 MB 
+[1]    3219 killed     ./a.out
+```
 
 程序内存分配到一定 1600M 多一点的时候就被系统杀掉了，通过 dmesg 可以查看 OOM 的信息。
 
-    $ dmesg -T
+```powershell
+$ dmesg -T
 
-    [Thu Oct 15 10:59:35 2020] a.out invoked oom-killer: gfp_mask=0x280da, order=0, oom_score_adj=0
-    ...
-    [Thu Oct 15 10:59:35 2020] Out of memory: Kill process 3312 (a.out) score 882 or sacrifice child
+[Thu Oct 15 10:59:35 2020] a.out invoked oom-killer: gfp_mask=0x280da, order=0, oom_score_adj=0
+...
+[Thu Oct 15 10:59:35 2020] Out of memory: Kill process 3312 (a.out) score 882 or sacrifice child
+```
 
 ### OOM killer
 
@@ -200,8 +232,10 @@ swpused 列表示已经使用的 swap 区域的百分比，可以看到三次 a.
 
 oom\_score 的值可以通过 /proc/<pid>/oom\_score 的值来获取。如下所示：
 
-    $ cat /proc/15633/oom_score
-    559
+```powershell
+$ cat /proc/15633/oom_score
+559
+```
 
 可以看到进程号为 15633 进程的 oom\_score 值为 559。
 
@@ -215,21 +249,25 @@ oom\_score 计算的逻辑位于 `mm/oom_kill.c` 的 oom\_badness 方法中，oo
 
 除了通过内存的消耗，Linux 还提供了 oom\_score\_adj 选项来让用户可以对分数进行修正、可以通过修改 `/proc/{pid}/oom_score_adj` 来实现，它的值的范围是 -1000\~1000，它的定义如下：
 
-    #define OOM_SCORE_ADJ_MIN	(-1000)
-    #define OOM_SCORE_ADJ_MAX	1000
+```c
+#define OOM_SCORE_ADJ_MIN	(-1000)
+#define OOM_SCORE_ADJ_MAX	1000
+```
 
 进程的 oom\_score\_adj 的值设置得越大，同等情况下打分越高，越有可能被杀死。当
 oom\_score\_adj 被设定为最小值 -1000 时，badness 函数返回 0，也就是进程永远不会被 OOM-Killer 杀死。
 
 我们可以通过调整 oom\_score\_adj 的值动态观察最终的打分结果，当前有一个进程打分为 559，然后将 oom\_score\_adj 的值为改为 500，接下来再来查看 oom\_score 的值。
 
-    $ cat /proc/20846/oom_score
-    559
+```powershell
+$ cat /proc/20846/oom_score
+559
 
-    $ echo 500 > /proc/20846/oom_score_adj
+$ echo 500 > /proc/20846/oom_score_adj
 
-    $ cat /proc/20846/oom_score
-    1058
+$ cat /proc/20846/oom_score
+1058
+```
 
 可以看到 oom\_score\_adj 增加了 500，oom\_score 的值也增加了 499，至于为什么不是整 500，是因为 oom\_score 在计算中会转为千分制的形式，会有一些精度的丢失。
 
@@ -239,21 +277,27 @@ oom\_score\_adj 被设定为最小值 -1000 时，badness 函数返回 0，也�
 
 我们来实验一下：
 
-    $ echo 500 > /proc/`pidof a.out`/oom_score_adj  // success
+```powershell
+$ echo 500 > /proc/`pidof a.out`/oom_score_adj  // success
 
-    $ echo 1000 > /proc/`pidof a.out`/oom_score_adj // success
+$ echo 1000 > /proc/`pidof a.out`/oom_score_adj // success
 
-    $ echo -500 > /proc/`pidof a.out`/oom_score_adj // fail
-    echo: write error: permission denied
+$ echo -500 > /proc/`pidof a.out`/oom_score_adj // fail
+echo: write error: permission denied
+```
 
 可以看到在尝试将 oom\_score\_adj 改为 -500 的时候提示无权限。接下来用 sudo 进行修改：
 
-    $ sudo echo -500 > /proc/`pidof a.out`/oom_score_adj // success
+```powershell
+$ sudo echo -500 > /proc/`pidof a.out`/oom_score_adj // success
+```
 
 接下来用普通用户再去修改 -400、-200 就没有问题。
 
-    $ echo -400 > /proc/`pidof a.out`/oom_score_adj
-    $ echo -200 > /proc/`pidof a.out`/oom_score_adj
+```powershell
+$ echo -400 > /proc/`pidof a.out`/oom_score_adj
+$ echo -200 > /proc/`pidof a.out`/oom_score_adj
+```
 
 如果想改为 -600 还是会提示无权限。
 
@@ -263,7 +307,7 @@ Linux 就是在进程的结构体里记录了 oom\_score\_adj 出现过的最小
 
 下面是一个线上的 OOM 日志，为什么 oom 日志中的 rss 看起来显示很小，但还是被杀了。total\_vm:2037170k，实际 rss：510330k，limit 是 2G，但是容器被 oom 干掉了，比如这个名为 rtc 的程序：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/9f09dbd6530a4f03b83a06fad5fd63d3~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1864\&h=606\&s=622541\&e=jpg\&b=000000)
+![](image/oom.png)
 
 通过源码分析： https://elixir.bootlin.com/linux/v3.10.108/source/mm/oom_kill.c#L343
 

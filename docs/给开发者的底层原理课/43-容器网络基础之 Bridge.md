@@ -36,7 +36,7 @@ brctl 是专门用于创建和管理 Linux Bridge 的命令行工具,需要安�
 
 首先使用 ip netns 创建两个网络命名空间，我们假装这是两个容器，为了方便下面也用「容器」这个词来描述。
 
-```shell
+```powershell
 $ sudo ip netns add n1
 $ sudo ip netns add n2
 
@@ -47,17 +47,21 @@ n1
 
 接下来使用 ip 命令创建两对 veth 设备对
 
-    sudo ip link add veth0 type veth peer name veth1
-    sudo ip link add veth2 type veth peer name veth3
+```powershell
+sudo ip link add veth0 type veth peer name veth1
+sudo ip link add veth2 type veth peer name veth3
+```
 
 然后把 veth1 放入 n1 网络命名空间，veth3 放入 n2 命令空间。
 
-    sudo ip link set veth1 netns n1
-    sudo ip link set veth3 netns n2
+```powershell
+sudo ip link set veth1 netns n1
+sudo ip link set veth3 netns n2
+```
 
 我们来看下 n1 命名空间中的网卡信息
 
-```shell
+```powershell
 $ sudo ip netns exec n1 ifconfig -a                                                                                                                       
 
 lo: flags=8<LOOPBACK>  mtu 65536
@@ -77,7 +81,7 @@ veth1: flags=4098<BROADCAST,MULTICAST>  mtu 1500
 
 接下来给容器内 veth1 和 veth2 配置 ip 并启用（up）。
 
-```shell
+```powershell
 $ sudo ip netns exec n1 ip addr add 192.168.1.10/24 dev veth1
 $ sudo ip netns exec n2 ip addr add 192.168.1.20/24 dev veth3
 
@@ -87,13 +91,15 @@ $ sudo ip netns exec n2 ip link set veth3 up
 
 接下来创建网桥 br0，把 veth0 和 veth2 "插到"网桥 br0 端口上。
 
-    sudo ip link add br0 type bridge
-    sudo ip link set br0 up
-    sudo ip link set veth0 master br0
-    sudo ip link set veth2 master br0
+```powershell
+sudo ip link add br0 type bridge
+sudo ip link set br0 up
+sudo ip link set veth0 master br0
+sudo ip link set veth2 master br0
 
-    sudo ip link set veth0 up
-    sudo ip link set veth2 up
+sudo ip link set veth0 up
+sudo ip link set veth2 up
+```
 
 目前的网络结构如下
 
@@ -115,12 +121,14 @@ $ sudo ip netns exec n2 ip link set veth3 up
 
 此时万事俱备，尝试在 n1 容器内 ping 容器 2 的 ip(192.168.1.20)
 
-    $ sudo ip netns exec n1 ping 192.168.1.20 -I veth1
+```powershell
+$ sudo ip netns exec n1 ping 192.168.1.20 -I veth1
 
-    PING 192.168.1.20 (192.168.1.20) 56(84) bytes of data.
-    64 bytes from 192.168.1.20: icmp_seq=1 ttl=64 time=0.091 ms
-    64 bytes from 192.168.1.20: icmp_seq=2 ttl=64 time=0.093 ms
-    64 bytes from 192.168.1.20: icmp_seq=3 ttl=64 time=0.098 ms
+PING 192.168.1.20 (192.168.1.20) 56(84) bytes of data.
+64 bytes from 192.168.1.20: icmp_seq=1 ttl=64 time=0.091 ms
+64 bytes from 192.168.1.20: icmp_seq=2 ttl=64 time=0.093 ms
+64 bytes from 192.168.1.20: icmp_seq=3 ttl=64 time=0.098 ms
+```
 
 大功告成，此时两个隔离的容器环境的网络可以互相访问了。
 
@@ -133,18 +141,20 @@ $ sudo ip netns exec n2 ip link set veth3 up
 
 此时查看 fdb 表，is local 表示当前是否属于网桥端口自身的 MAC 地址。
 
-    $ brctl showmacs br0
+```powershell
+$ brctl showmacs br0
 
-    port no	mac addr	     	is local?	ageing timer
-      1	    5a:28:d3:58:3c:2a	yes		   0.00              -- veth0
-      1	    62:2c:e4:33:29:41	no		   0.03              -- veth1
-      2	    5e:b2:32:81:bd:f1	yes		   0.00              -- veth2
-      2	    06:f6:5d:7e:80:f2	no		   0.03              -- veth3
+port no	mac addr	     	is local?	ageing timer
+  1	    5a:28:d3:58:3c:2a	yes		   0.00              -- veth0
+  1	    62:2c:e4:33:29:41	no		   0.03              -- veth1
+  2	    5e:b2:32:81:bd:f1	yes		   0.00              -- veth2
+  2	    06:f6:5d:7e:80:f2	no		   0.03              -- veth3
+```
 
 当容器 n1 需要 ping 访问 192.168.1.20，因为发现是同一个网段，首先 veth1(62:2c:e4:33:29:41) 会发起一个 arp 广播请求，问局域网中
 192.168.1.20 的 mac 地址是什么。
 
-![img\_1.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/73045628daad43debfa693714a65d6f3~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1157\&h=135\&s=92895\&e=png\&b=f8d9fa)
+![img\_1.png](image/container21.png)
 
 接下来我们深入看看 Bridge 在内核层的实现。
 
@@ -250,66 +260,78 @@ static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 
 下面是把一个 veth 设备 veth0 加入网桥 br0 的时候的 debug 效果，
 
-    $ ifconfig
-    veth0     Link encap:Ethernet  HWaddr 72:E6:8C:03:68:01
-              inet addr:192.168.1.100  Bcast:192.168.1.255  Mask:255.255.255.0
-              inet6 addr: fe80::70e6:8cff:fe03:6801/64 Scope:Link
-              UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
-              RX packets:10 errors:0 dropped:0 overruns:0 frame:0
-              TX packets:9 errors:0 dropped:0 overruns:0 carrier:0
-              collisions:0 txqueuelen:0
-              RX bytes:796 (796.0 B)  TX bytes:726 (726.0 B)
-              
-    $ brctl addbr br0          
+```powershell
+$ ifconfig
+veth0     Link encap:Ethernet  HWaddr 72:E6:8C:03:68:01
+          inet addr:192.168.1.100  Bcast:192.168.1.255  Mask:255.255.255.0
+          inet6 addr: fe80::70e6:8cff:fe03:6801/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:10 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:9 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:796 (796.0 B)  TX bytes:726 (726.0 B)
+          
+$ brctl addbr br0          
+```
 
 我们可以使用 gdb 查看各个值，帮你更直观的知道网桥新增一个端口设备是怎么回事，首先在 `br_fdb_insert` 函数处加断点。
 
-    $ brctl addif br0 veth0
+```powershell
+$ brctl addif br0 veth0
+```
 
 此时会命中断点，可以通过 bt 查看此时的调用堆栈
 
-    (gdb) bt
-    #0  br_fdb_insert (br=0xffff8880063c3880, source=0xffff888006395400, addr=0xffff888006d19c10 "r\346\214\003h\001", vid=0) at ./include/linux/spinlock.h:334
-    #1  0xffffffff8193ea9b in br_add_if (br=0xffff8880063c3880, dev=0xffff88800632a000, extack=<optimized out>) at net/bridge/br_if.c:668
-    #2  0xffffffff81829a44 in dev_ioctl (net=0xffffffff824e6500 <init_net>, cmd=35234, ifr=0xffffc90000147da0, need_copyout=0xffffc90000147d90) at net/core/dev_ioctl.c:488
-    #3  0xffffffff817e15c1 in sock_do_ioctl (net=0xffffffff824e6500 <init_net>, sock=<optimized out>, cmd=35234, arg=140731761192720) at net/socket.c:1067
-    #4  0xffffffff817e1889 in sock_ioctl (file=<optimized out>, cmd=35234, arg=140731761192720) at net/socket.c:1164
-    #5  0xffffffff811c15d1 in vfs_ioctl (arg=<optimized out>, cmd=<optimized out>, filp=<optimized out>) at fs/ioctl.c:46
-    #6  file_ioctl (arg=<optimized out>, cmd=<optimized out>, filp=<optimized out>) at fs/ioctl.c:501
-    #7  do_vfs_ioctl (filp=0xffff8880062fe200, fd=<optimized out>, cmd=<optimized out>, arg=140731761192720) at fs/ioctl.c:688
-    #8  0xffffffff811c1909 in ksys_ioctl (fd=3, cmd=35234, arg=140731761192720) at fs/ioctl.c:705
-    #9  0xffffffff811c194f in __do_sys_ioctl (arg=<optimized out>, cmd=<optimized out>, fd=<optimized out>) at fs/ioctl.c:712
-    #10 __se_sys_ioctl (arg=<optimized out>, cmd=<optimized out>, fd=<optimized out>) at fs/ioctl.c:710
-    #11 __x64_sys_ioctl (regs=<optimized out>) at fs/ioctl.c:710
-    #12 0xffffffff810020d3 in do_syscall_64 (nr=<optimized out>, regs=0xffffc90000147f58) at arch/x86/entry/common.c:293
-    #13 0xffffffff81c00090 in entry_SYSCALL_64 () at arch/x86/entry/entry_64.S:242
-    #14 0x0000000000000000 in ?? ()
+```powershell
+(gdb) bt
+#0  br_fdb_insert (br=0xffff8880063c3880, source=0xffff888006395400, addr=0xffff888006d19c10 "r\346\214\003h\001", vid=0) at ./include/linux/spinlock.h:334
+#1  0xffffffff8193ea9b in br_add_if (br=0xffff8880063c3880, dev=0xffff88800632a000, extack=<optimized out>) at net/bridge/br_if.c:668
+#2  0xffffffff81829a44 in dev_ioctl (net=0xffffffff824e6500 <init_net>, cmd=35234, ifr=0xffffc90000147da0, need_copyout=0xffffc90000147d90) at net/core/dev_ioctl.c:488
+#3  0xffffffff817e15c1 in sock_do_ioctl (net=0xffffffff824e6500 <init_net>, sock=<optimized out>, cmd=35234, arg=140731761192720) at net/socket.c:1067
+#4  0xffffffff817e1889 in sock_ioctl (file=<optimized out>, cmd=35234, arg=140731761192720) at net/socket.c:1164
+#5  0xffffffff811c15d1 in vfs_ioctl (arg=<optimized out>, cmd=<optimized out>, filp=<optimized out>) at fs/ioctl.c:46
+#6  file_ioctl (arg=<optimized out>, cmd=<optimized out>, filp=<optimized out>) at fs/ioctl.c:501
+#7  do_vfs_ioctl (filp=0xffff8880062fe200, fd=<optimized out>, cmd=<optimized out>, arg=140731761192720) at fs/ioctl.c:688
+#8  0xffffffff811c1909 in ksys_ioctl (fd=3, cmd=35234, arg=140731761192720) at fs/ioctl.c:705
+#9  0xffffffff811c194f in __do_sys_ioctl (arg=<optimized out>, cmd=<optimized out>, fd=<optimized out>) at fs/ioctl.c:712
+#10 __se_sys_ioctl (arg=<optimized out>, cmd=<optimized out>, fd=<optimized out>) at fs/ioctl.c:710
+#11 __x64_sys_ioctl (regs=<optimized out>) at fs/ioctl.c:710
+#12 0xffffffff810020d3 in do_syscall_64 (nr=<optimized out>, regs=0xffffc90000147f58) at arch/x86/entry/common.c:293
+#13 0xffffffff81c00090 in entry_SYSCALL_64 () at arch/x86/entry/entry_64.S:242
+#14 0x0000000000000000 in ?? ()
+```
 
 我们先来查看 br 的类型和值， 可以看到这里的要操作的设备的设备名为 "br0"。
 
-    (gdb) p br
-    $28 = (struct net_bridge *) 0xffff8880063c3880
-    (gdb) p br.dev
-    $29 = (struct net_device *) 0xffff8880063c3000
-    (gdb) p/s br.dev.name
-    $31 = "br0", '\000' <repeats 12 times>
+```powershell
+(gdb) p br
+$28 = (struct net_bridge *) 0xffff8880063c3880
+(gdb) p br.dev
+$29 = (struct net_device *) 0xffff8880063c3000
+(gdb) p/s br.dev.name
+$31 = "br0", '\000' <repeats 12 times>
+```
 
 再来查看 source 的类型和值，可以看到此时的想要添加的设备为 veth0，不要添加到的网桥设备指针为
 0xffff8880063c3880，也就是函数的第一个参数。
 
-    (gdb) p source.br
-    $35 = (struct net_bridge *) 0xffff8880063c3880
-    (gdb) p source.dev
-    $36 = (struct net_device *) 0xffff88800632a000
-    (gdb) p source.dev.name
-    $37 = "veth0\000\000\000\000\000\000\000\000\000\000"
-    (gdb) p source.port_no
-    $38 = 1
+```powershell
+(gdb) p source.br
+$35 = (struct net_bridge *) 0xffff8880063c3880
+(gdb) p source.dev
+$36 = (struct net_device *) 0xffff88800632a000
+(gdb) p source.dev.name
+$37 = "veth0\000\000\000\000\000\000\000\000\000\000"
+(gdb) p source.port_no
+$38 = 1
+```
 
 我们来看看 addr 的值，因为 mac 地址用 6 字节表示，我们用 x 命令来打印 addr 的值
 
-    (gdb) x/6bx addr
-    0xffff888006d19c10:	0x72	0xe6	0x8c	0x03	0x68	0x01
+```powershell
+(gdb) x/6bx addr
+0xffff888006d19c10:	0x72	0xe6	0x8c	0x03	0x68	0x01
+```
 
 可以看到确实是前面 ifconfig 输出中的 veth0 的 mac 地址（72:E6:8C:03:68:01）。
 

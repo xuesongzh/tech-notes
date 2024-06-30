@@ -9,7 +9,7 @@ CGroup 的全称是 Control Group，是容器实现环境隔离的两种关键�
 
 CGroup 的所有操作都是基于 cgroup virtual filesystem，这个文件系统一般挂载在 `/sys/fs/cgroup` 目录下，通过 ls 查看这个目录信息如下：
 
-```
+```powershell
 $ ls -l /sys/fs/cgroup 
 drwxr-xr-x. 2 root root  0 Dec  6 03:07 blkio
 lrwxrwxrwx. 1 root root 11 Dec  6 03:07 cpu -> cpu,cpuacct
@@ -35,14 +35,14 @@ drwxr-xr-x. 4 root root  0 Dec  6 03:07 systemd
 
 在对应的子系统中创建一个目录就可以创建一个 cgroup 了，我们 cd 进入 cpu 目录，然后创建一个目录 A：
 
-```
+```powershell
 $ cd /sys/fs/cgroup/cpu
 $ mkdir A
 ```
 
 cgroup 会自动在 A 目录中创建需要的文件：
 
-```
+```powershell
 $ cd /sys/fs/cgroup/cpu
 $ ls -l A
 total 0
@@ -69,7 +69,7 @@ total 0
 
 启动 busy -j4，启动 4 个死循环的线程，此时在我双核的虚拟机上，进程会跑满 200% 的 CPU 资源。
 
-```
+```powershell
 $ ./busy -j4
 
 $ top -p `pidof busy`
@@ -80,7 +80,7 @@ $ top -p `pidof busy`
 
 接下来我们把这个进程加入到 cgroup 的 A 组中，只需要把进程号写入到 A 组目录下的 tasks 文件中即可。
 
-```
+```powershell
 $ sudo sh -c "echo 14839 > A/cgroup.procs"
 ```
 
@@ -93,13 +93,13 @@ cgroup 提供了 `cpu.cfs_quota_us` 和 `cpu.cfs_period_us` 两个参数限制 C
 
 如果我们想限制上面的 busy 进程最多只能占用 30% 的 CPU，可以将 A 组的 cpu.cfs_quota_us 值改为 30000，也就是 100ms CPU 周期内 A 组的进程只能跑 30ms。
 
-```
+```powershell
 sudo sh -c "echo 30000 > A/cpu.cfs_quota_us"
 ```
 
 此时使用 top 命令查看 busy 的占用，就可以看到 cpu 占用在 30% 左右浮动了。
 
-```
+```powershell
 $ top -p `pidof busy`
 
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
@@ -115,7 +115,7 @@ $ top -p `pidof busy`
 
 接下来我们来做一些实验。还是以之前的 busy 程序为例，开启两个终端，都执行 busy -j4：
 
-```
+```powershell
 # 终端 1
 $ ./busy -j4
 
@@ -125,7 +125,7 @@ $ ./busy -j4
 
 使用 top 命令来看，这两个进程各占了 100% 左右的 CPU：
 
-```
+```powershell
 $ top
 
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
@@ -136,7 +136,7 @@ $ top
 然后创建两个 cgroup 组 group1、group2，将上面两个进程分别添加到两个组里：
 
 
-```
+```powershell
 $ mkdir group1
 $ mkdir group2
 $ echo 27473 > group1/cgroup.procs
@@ -147,7 +147,7 @@ $ echo 512 > group1/cpu.shares
 
 此时两个进程的 CPU 占用依然是 100% 左右，接下来修改 group1 的 cpu.shares 为  512，group2 的 cpu.shares 值保持默认值 1024。
 
-```
+```powershell
 $ top
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
 27517 ya        20   0   39292    380    300 S 133.3  0.0  11:30.58 busy
@@ -158,7 +158,7 @@ $ top
 
 值得注意的是，cpu.shares 限制的是 CPU 使用的下限，如果 group1 和 group2 的cpu.shares 维持不变，分别为 512 和 1024。在 group2 中的进程占用 CPU 很小的情况下，group1 中的进程依然可以占用超过 1/3 的 CPU 资源。如下所示，group1 的进程 27473 已经跑满了 200% 的 CPU 资源。
 
-```
+```powershell
 $ top
 
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
@@ -169,7 +169,7 @@ $ top
 
 创建两个 cgroup：group3、group4。
 
-```
+```powershell
 $ cd /sys/fs/cgroup/cpu
 $ mkdir group3
 $ mkdir group4
@@ -177,7 +177,7 @@ $ mkdir group4
 
 启动三个进程 `./busy -j8`，此时 cpu 占用情况是各占 66.6%：
 
-```
+```powershell
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
  1809 ya        20   0   72076    640    488 S  71.1  0.0   0:55.83 busy
  1689 ya        20   0   72076    640    488 S  70.1  0.0   1:22.07 busy
@@ -186,14 +186,14 @@ $ mkdir group4
 
 将其中两个进程分别加入到 group3 和 group4：
 
-```
+```powershell
 echo 1689 > group3/cgroup.procs
 echo 1701 > group4/cgroup.procs
 ```
 
 然后来观察者三个进程的占用情况：
 
-```
+```powershell
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM
  1809 ya        20   0   72076    640    488 S 159.8  0.0
  1689 ya        20   0   72076    640    488 S  19.9  0.0
@@ -214,15 +214,15 @@ CFS 调度算法是善意的，强调众生平等公平，默认是以 task 为�
 
 在软件中也有类似的例子，有一台 2 核的编译服务，如果三个用户 A、B、C 在同时使用，编译是一个 CPU 密集型操作。他们都默认使用 make -j2 来编译，这样 A、B、C 平均分到 1/3 的 CPU，如下图所示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/db223398eaba404681363c51bc86e81a~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/process10.png)
 
 这个时候机智的 A 把编译调整为了 make -j4，这样他就拿到了 1/2 的 CPU，B 和 C 就只能拿到 1/4 的 CPU，如下图所示：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/09148eea4a0c40919afeff2e929cede3~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/process11.png)
 
 fake_make 程序的源码如下：
 
-```
+```c
 int get_job_num(int argc, char *const *argv);
 void *busy(void *args) {
     while (1);
@@ -246,7 +246,7 @@ int main(int argc, char *argv[]) {
 
 使用 sysctl 打开 sched_autogroup 特性：
 
-```
+```powershell
 $ sudo sysctl -w kernel.sched_autogroup_enabled=1
 
 kernel.sched_autogroup_enabled = 1
@@ -254,7 +254,7 @@ kernel.sched_autogroup_enabled = 1
 
 重新做这个实验，退出登录 A、B、C 用户随后重新登录（备注：不用不同用户也没有问题，只要是重新登录是新会话就行，这里用多用户更好区分），然后执行 busy，A 还是启动 4 个线程，B 和 C 启动两个线程。
 
-```
+```powershell
 [A@c4]$ ./fake_make -j4
 job num: 4
 
@@ -267,13 +267,13 @@ job num: 2
 
 这时查看 CPU 占用的结果如下：
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1e7dae3c0a924abdbdfd7bf2966c2eae~tplv-k3u1fbpfcp-zoom-1.image)
+![](image/process12.png)
 
 sched_autogroup 变量将属于同一个会话 session 的进程归为一个会话组，这个会话组可以看做以一个整体进行调度，这里的会话组，其实就是 cgroup。
 
 通过 `/proc/<pid>/autogroup` 文件可以查看每个进程所属的 autogroup 信息。
 
-```
+```powershell
 $ cat /proc/7469/autogroup
 /autogroup-7974 nice 0
 
@@ -289,7 +289,7 @@ $ cat /proc/8610/autogroup
 
 我们在一个 bash 终端启动的进程都属于同一个会话，比如我们以 A 用户登录服务器以后启动三个 sleep 进程放入后台执行，如下所示：
 
-```
+```powershell
 $ ps -e -o pid,ppid,user,sid,comm  | grep A
   PID  PPID USER       SID COMMAND
 17032 17031 A        17032 bash

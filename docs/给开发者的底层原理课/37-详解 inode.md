@@ -4,7 +4,7 @@
 
 可以使用 `ls -i` 查看一个文件的 inode 号，也使用 stat 命令可以查看文件的 inode 信息。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/74f5cf37091849a3bf5ade47dbbafcb8~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1620\&h=554\&s=188966\&e=jpg\&b=010101)
+![](image/inode.png)
 
 ## inode 的内部细节
 
@@ -64,28 +64,32 @@ struct ext4_inode {
 
 当我们创建一个 test.txt 文件同时写入内容时，这个文件的 `i_ctime`、`i_ctime`、`i_mtime`都是一样的。
 
-    $ stat test.txt
-      File: test.txt
-      Size: 6         	Blocks: 8          IO Block: 4096   regular file
-    Device: 811h/2065d	Inode: 52570074    Links: 1
-    Access: (0664/-rw-rw-r--)  Uid: ( 1000/    care)   Gid: ( 1004/    care)
-    Access: 2023-01-09 16:00:46.539931558 +0800
-    Modify: 2023-01-09 16:00:46.539931558 +0800
-    Change: 2023-01-09 16:00:46.539931558 +0800
-     Birth: -
+```powershell
+$ stat test.txt
+  File: test.txt
+  Size: 6         	Blocks: 8          IO Block: 4096   regular file
+Device: 811h/2065d	Inode: 52570074    Links: 1
+Access: (0664/-rw-rw-r--)  Uid: ( 1000/    care)   Gid: ( 1004/    care)
+Access: 2023-01-09 16:00:46.539931558 +0800
+Modify: 2023-01-09 16:00:46.539931558 +0800
+Change: 2023-01-09 16:00:46.539931558 +0800
+ Birth: -
+```
 
 这个时候修改文件的权限，增加可执行权限
 
-    $ chmod a+x test.txt
-    care001 :: /data/dev/ya » stat test.txt
-      File: test.txt
-      Size: 6         	Blocks: 8          IO Block: 4096   regular file
-    Device: 811h/2065d	Inode: 52570074    Links: 1
-    Access: (0775/-rwxrwxr-x)  Uid: ( 1000/    care)   Gid: ( 1004/    care)
-    Access: 2023-01-09 16:00:46.539931558 +0800
-    Modify: 2023-01-09 16:00:46.539931558 +0800
-    Change: 2023-01-09 16:01:01.879952049 +0800
-     Birth: -
+```powershell
+$ chmod a+x test.txt
+care001 :: /data/dev/ya » stat test.txt
+  File: test.txt
+  Size: 6         	Blocks: 8          IO Block: 4096   regular file
+Device: 811h/2065d	Inode: 52570074    Links: 1
+Access: (0775/-rwxrwxr-x)  Uid: ( 1000/    care)   Gid: ( 1004/    care)
+Access: 2023-01-09 16:00:46.539931558 +0800
+Modify: 2023-01-09 16:00:46.539931558 +0800
+Change: 2023-01-09 16:01:01.879952049 +0800
+ Birth: -
+```
 
 可以看到此时的 `i_ctime` 发生了变化，`i_mtime` 没有发生变化。你可以尝试修改文件，随后看看 `i_ctime` 和 `i_mtime` 是否有发生变化。
 
@@ -100,7 +104,7 @@ ext4 与 ext2、ext3 的 `i_block` 含义不太一样，我们先来看 ext2、e
 
 如下图所示。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5d2855b58b634c3f9eb67a9751b0153b~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=971\&h=826\&s=140492\&e=jpg\&b=fdfcfc)
+![](image/inode2.png)
 
 可以看到传统的文件系统（ext2、ext3）有如下几个不足：
 
@@ -150,16 +154,18 @@ struct ext4_extent_idx {
 
 不管是叶子节点还是索引节点，最开始的 12 字节总是一个名为 `ext4_extent_header` 结构，用来存储 extents 的信息，它的结构如下：
 
-    /*
-     * Each block (leaves and indexes), even inode-stored has header.
-     */
-    struct ext4_extent_header {
-    	__le16	eh_magic;	/* probably will support different formats */
-    	__le16	eh_entries;	/* number of valid entries */
-    	__le16	eh_max;		/* capacity of store in entries */
-    	__le16	eh_depth;	/* has tree real underlying blocks? */
-    	__le32	eh_generation;	/* generation of the tree */
-    };
+```c
+/*
+ * Each block (leaves and indexes), even inode-stored has header.
+ */
+struct ext4_extent_header {
+	__le16	eh_magic;	/* probably will support different formats */
+	__le16	eh_entries;	/* number of valid entries */
+	__le16	eh_max;		/* capacity of store in entries */
+	__le16	eh_depth;	/* has tree real underlying blocks? */
+	__le32	eh_generation;	/* generation of the tree */
+};
+```
 
 其中：
 
@@ -170,40 +176,48 @@ struct ext4_extent_idx {
 
 Extents 树形结构如下所示。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/edfbc370d21f4c89bc743f835fc4fd64~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=5291\&h=1804\&s=968760\&e=jpg\&b=fbf6f5)
+![](image/inode3.png)
 
 ## 使用 debugfs 来窥探 inode 的内部细节
 
 `debugfs` 是一个交互式的基于 `ext2/ext3/ext4` 文件系统的命令行调试器。默认情况下，debugfs 将以只读模式打开文件，使用 -w 标识去以读写模式打开它。在运行 debugfs 之前，可以先用 `df -hT` 命令得到文件系统设备名。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/2e1537de09f94a1788d7fed77039cdf8~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1686\&h=506\&s=191459\&e=jpg\&b=010101)
+![](image/inode4.png)
 
 使用 debugfs 时需要先挂载相关的文件系统，比如挂载 `/home` 目录对应的 `/dev/mapper/VolGroup-lv_home`：
 
-    $ sudo debugfs /dev/mapper/VolGroup-lv_home
-    debugfs 1.42.9 (28-Dec-2013)
+```powershell
+$ sudo debugfs /dev/mapper/VolGroup-lv_home
+debugfs 1.42.9 (28-Dec-2013)
+```
 
 进入 debugfs 以后，可以使用 `?` 或者 help 查看所有的命令。
 
 可以使用 stat 命令查看某个 inode 的信息：
 
-    stat <inode>
+```powershell
+stat <inode>
+```
 
 可以看到 ext4 文件系统 inode 的信息都显示了出来。
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/0fd0aac8c10d41348f0b4a11cec94c9c~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1378\&h=800\&s=295170\&e=jpg\&b=010101)
+![](image/inode5.png)
 
 还可以使用 dump 命令将某个 inode 的内容导出到文件中：
 
-    dump <inode> <file>
+```powershell
+dump <inode> <file>
+```
 
 比如有这样一个 test.c 文件，inode 号为 `146888`，通过 dump 命令就可以将该 inode 文件存储到 dump.out 中。
 
-    dump <146888> dump.out
+```powershell
+dump <146888> dump.out
+```
 
 还可以使用 lsdel 命令列出被删除但尚未从文件系统中清除的 inode
 
-![](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/c84290be2f9a405bbd287017222fd74a~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1560\&h=616\&s=226665\&e=jpg\&b=010101)
+![](image/inode6.png)
 
 利用这个功能结合 dump 恢复误删的文件，这里不展开。
 
@@ -211,13 +225,13 @@ Extents 树形结构如下所示。
 
 一个方法是通过 find 命令
 
-```bash
+```powershell
 find /your/path -xdev -printf '%i %p\n' 
 ```
 
 可以对上面的命令进行过滤，比如找 inode 为 12345 的文件.
 
-```bash
+```powershell
 find /your/path -xdev -printf '%i %p\n' | awk '$1 == 12345 { print $2 }'
 ```
 
@@ -225,7 +239,7 @@ find /your/path -xdev -printf '%i %p\n' | awk '$1 == 12345 { print $2 }'
 
 有时候有一些文件名比较特殊，无法直接用 `rm` 命令在终端中删除，这个时候就可以通过先找到 `inode` 然后通过 `inode` 去删除。
 
-```bash
+```powershell
 $ ls -i specical_file.txt                                                                                         
 130512 specical_file.txt
 

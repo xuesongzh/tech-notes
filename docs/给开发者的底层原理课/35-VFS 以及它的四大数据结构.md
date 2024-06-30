@@ -4,7 +4,7 @@ Unix/Linux 操作系统以其独特的哲学理念著称于世 —— “一切�
 
 虚拟文件系统（Virtual File System，简称 VFS）在这一体系中扮演着至关重要的角色。作为一个中间层的抽象，VFS 为各类文件系统和存储资源提供了一个统一的接口。
 
-![vfs](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/050b2cddd88e498e8e108f69e503616a~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=4374\&h=2904\&s=1306348\&e=jpg\&b=fffefe)
+![vfs](image/vfs.png)
 
 
 ## VFS 数据结构
@@ -127,31 +127,33 @@ struct inode_operations {
 
 下面是我们调试 linux 内核得到的一个实际的 inode 数据：
 
-    $ ls -i /tmp/x/y/z/test.txt
-       7753 /tmp/x/y/z/test.txt
-       
-    $(gdb) p *inode
-    $7 = {
-        i_mode = 33188,
-        i_opflags = 13,
-        i_op = 0xffffffff820158c0 <shmem_inode_operations>,
-        i_sb = 0xffff8880062bc800,
-        i_ino = 7753,
-        i_size = 6,
-        i_atime = {
-            tv_sec = 1705544475,
-            tv_nsec = 561752392
-        },
-        i_mtime = {
-            tv_sec = 1705544485,
-            tv_nsec = 873751968
-        },
-        i_ctime = {
-            tv_sec = 1705544485,
-            tv_nsec = 873751968
-        },
-        ...
-    }
+```powershell
+$ ls -i /tmp/x/y/z/test.txt
+   7753 /tmp/x/y/z/test.txt
+   
+$(gdb) p *inode
+$7 = {
+    i_mode = 33188,
+    i_opflags = 13,
+    i_op = 0xffffffff820158c0 <shmem_inode_operations>,
+    i_sb = 0xffff8880062bc800,
+    i_ino = 7753,
+    i_size = 6,
+    i_atime = {
+        tv_sec = 1705544475,
+        tv_nsec = 561752392
+    },
+    i_mtime = {
+        tv_sec = 1705544485,
+        tv_nsec = 873751968
+    },
+    i_ctime = {
+        tv_sec = 1705544485,
+        tv_nsec = 873751968
+    },
+    ...
+}
+```
 
 
 ## dentry
@@ -165,18 +167,20 @@ dentry 对象包含文件或目录的字符串名称、指向其 inode 的指针
 
 下面这是一个使用 GDB 调试 qemu 中打印的 dentry 的层级关系：
 
-    (gdb) p dentry.d_name.name
-    $26 = (const unsigned char *) 0xffff8880065946f8 "test.txt"
-    (gdb) p dentry.d_parent.d_name.name
-    $27 = (const unsigned char *) 0xffff888006594878 "z"
-    (gdb) p dentry.d_parent.d_parent.d_name.name
-    $28 = (const unsigned char *) 0xffff888006654e78 "y"
-    (gdb) p dentry.d_parent.d_parent.d_parent.d_name.name
-    $29 = (const unsigned char *) 0xffff888006654cf8 "x"
-    (gdb) p dentry.d_parent.d_parent.d_parent.d_parent.d_name.name
-    $30 = (const unsigned char *) 0xffff888006594db8 "/"
-    (gdb) p dentry.d_parent.d_parent.d_parent.d_parent.d_parent.d_name.name
-    $31 = (const unsigned char *) 0xffff888006594db8 "/"
+```powershell
+(gdb) p dentry.d_name.name
+$26 = (const unsigned char *) 0xffff8880065946f8 "test.txt"
+(gdb) p dentry.d_parent.d_name.name
+$27 = (const unsigned char *) 0xffff888006594878 "z"
+(gdb) p dentry.d_parent.d_parent.d_name.name
+$28 = (const unsigned char *) 0xffff888006654e78 "y"
+(gdb) p dentry.d_parent.d_parent.d_parent.d_name.name
+$29 = (const unsigned char *) 0xffff888006654cf8 "x"
+(gdb) p dentry.d_parent.d_parent.d_parent.d_parent.d_name.name
+$30 = (const unsigned char *) 0xffff888006594db8 "/"
+(gdb) p dentry.d_parent.d_parent.d_parent.d_parent.d_parent.d_name.name
+$31 = (const unsigned char *) 0xffff888006594db8 "/"
+```
 
 可以看到 dentry 可以一直递归直到找到 root 路径。
 
@@ -211,7 +215,7 @@ dentry 缓存通过减少对磁盘的直接访问次数，加快了文件查找�
 
 管理是有成本的，inode、dentry 本身需要消耗内存，我们可以通过 `/proc/slabinfo` 文件获取系统 dentry 和 inode 的内存消耗大小。
 
-```shell
+```powershell
 $ sudo cat /proc/slabinfo | grep -E '^#|dentry|inode'
 
 # name            <active_objs> <num_objs> <objsize> <objperslab> <pagesperslab> : tunables <limit> <batchcount> <sharedfactor> : slabdata <active_slabs> <num_slabs> <sharedavail>
@@ -237,23 +241,25 @@ dentry            2293066 2545452    192   21    1 : tunables    0    0    0 : s
 
 在性能分析中，我们更多会使用 `slabtop` 命令来查看不同类型缓存占用的内存，它的可读性更好。
 
-    $ sudo slabtop
+```powershell
+$ sudo slabtop
 
-     Active / Total Objects (% used)    : 22655356 / 31816142 (71.2%)
-     Active / Total Slabs (% used)      : 997220 / 997220 (100.0%)
-     Active / Total Caches (% used)     : 90 / 127 (70.9%)
-     Active / Total Size (% used)       : 4684670.19K / 5853805.69K (80.0%)
-     Minimum / Average / Maximum Object : 0.01K / 0.18K / 23.00K
+ Active / Total Objects (% used)    : 22655356 / 31816142 (71.2%)
+ Active / Total Slabs (% used)      : 997220 / 997220 (100.0%)
+ Active / Total Caches (% used)     : 90 / 127 (70.9%)
+ Active / Total Size (% used)       : 4684670.19K / 5853805.69K (80.0%)
+ Minimum / Average / Maximum Object : 0.01K / 0.18K / 23.00K
 
-      OBJS ACTIVE  USE OBJ SIZE  SLABS OBJ/SLAB CACHE SIZE NAME
-    18151770 10478447   0%    0.13K 605059       30   2420236K kernfs_node_cache
-    4676224 3782274   0%    0.06K  73066       64    292264K kmalloc-64
-    2551185 2295973   0%    0.19K 121485       21    485940K dentry
-    1817868 1816082   0%    0.60K  69918       26   1118688K inode_cache
-    1040325 907988   0%    0.10K  26675       39    106700K buffer_head
-    988288 960840   0%    0.57K  35296       28    564736K radix_tree_node
-    441600 282754   0%    0.03K   3450      128     13800K kmalloc-32
-    427373 420752   0%    1.07K  14737       29    471584K ext4_inode_cache
+  OBJS ACTIVE  USE OBJ SIZE  SLABS OBJ/SLAB CACHE SIZE NAME
+18151770 10478447   0%    0.13K 605059       30   2420236K kernfs_node_cache
+4676224 3782274   0%    0.06K  73066       64    292264K kmalloc-64
+2551185 2295973   0%    0.19K 121485       21    485940K dentry
+1817868 1816082   0%    0.60K  69918       26   1118688K inode_cache
+1040325 907988   0%    0.10K  26675       39    106700K buffer_head
+988288 960840   0%    0.57K  35296       28    564736K radix_tree_node
+441600 282754   0%    0.03K   3450      128     13800K kmalloc-32
+427373 420752   0%    1.07K  14737       29    471584K ext4_inode_cache
+```
 
 可以看到，在我的系统上，inode 和 dentry 占用的内存还是挺大的，加起来有差不多 1.5G。
 
@@ -282,4 +288,4 @@ struct file {
 
 它们之间的关系如下图所示：
 
-![vfs\_relation](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/3cabf1671ca44d9899eb726f74ba4d58~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=5162\&h=3112\&s=1221327\&e=jpg\&b=ffffff)
+![vfs\_relation](image/vfs2.png)

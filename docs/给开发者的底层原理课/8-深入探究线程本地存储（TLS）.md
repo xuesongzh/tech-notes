@@ -44,7 +44,7 @@ int main() {
 
 上面的代码中，首先定义了两个全局变量 `g_foo`、`g_bar`，赋值为 0，在两个新线程中修改全局变量的值，然后在 main 线程中打印两个全局变量的值，输出的结果如下：
 
-```c
+```powershell
 in new  thread, g_foo[0x601040]=0x12345679, g_bar[0x601044]=0x55555557
 in new  thread, g_foo[0x601040]=0x1234567a, g_bar[0x601044]=0x55555559
 in main thread, g_foo[0x601040]=0x1234567a, g_bar[0x601044]=0x55555559
@@ -63,23 +63,27 @@ __thread int g_bar = 0x55555555;
 
 再次编译运行上面的程序，可以看到此时两个线程中 `g_foo` 变量的地址是不一样的，新线程对全局变量 `g_foo` 的修改，并没有影响 main 线程对全局变量 `g_foo` 的读取。
 
-    in new  thread, g_foo[0x7f08ef35d6f8]=0x12345679, g_bar[0x7f08ef35d6fc]=0x55555557
-    in new  thread, g_foo[0x7f08eeb5c6f8]=0x12345679, g_bar[0x7f08eeb5c6fc]=0x55555557
-    in main thread, g_foo[0x7f08efb6e738]=0x12345678, g_bar[0x7f08efb6e73c]=0x55555555
+```powershell
+in new  thread, g_foo[0x7f08ef35d6f8]=0x12345679, g_bar[0x7f08ef35d6fc]=0x55555557
+in new  thread, g_foo[0x7f08eeb5c6f8]=0x12345679, g_bar[0x7f08eeb5c6fc]=0x55555557
+in main thread, g_foo[0x7f08efb6e738]=0x12345678, g_bar[0x7f08efb6e73c]=0x55555555
+```
 
 看起来很神奇，用同一个全局变量名去访问一个变量却得到了不同的结果。接下来我们用 GDB 来看一下加了 `__thread` 以后，程序到底发生了什么变化。
 
 在 thread\_func 函数处加一个断点，然后 r 运行整个程序。
 
-    $ gdb ./tls_test_01
+```powershell
+$ gdb ./tls_test_01
 
-    (gdb) b thread_func
-    Breakpoint 1 at 0x400619: file tls_test_01.c, line 9.
-    (gdb) r
+(gdb) b thread_func
+Breakpoint 1 at 0x400619: file tls_test_01.c, line 9.
+(gdb) r
+```
 
 使用 GDB 的 `disas` 命令查看 `thread_func` 的汇编代码。
 
-```
+```powershell
 11      void *thread_func(void *arg) {
    0x000000000040060d <+0>:     push   %rbp
    0x000000000040060e <+1>:     mov    %rsp,%rbp
@@ -118,21 +122,25 @@ FS 可以认为是 ES（Extra Segment）的扩展版本，FS 寄存器 X86 架�
 
 GDB 提供了一个 `$fs_base` 的伪寄存器来直接获取 FS 寄存器的值：
 
-    (gdb) info register fs_base
-    fs_base        0x7ffff77c2700      140737345496832
+```powershell
+(gdb) info register fs_base
+fs_base        0x7ffff77c2700      140737345496832
+```
 
 用 `thread apply all` 来查看一下当前所有线程的 fs\_base 值：
 
-    (gdb) thread apply all info register fs_base
+```powershell
+(gdb) thread apply all info register fs_base
 
-    Thread 3 (Thread 0x7ffff6fc1700 (LWP 7788) "tls_test_01"):
-    fs_base        0x7ffff6fc1700      140737337104128
+Thread 3 (Thread 0x7ffff6fc1700 (LWP 7788) "tls_test_01"):
+fs_base        0x7ffff6fc1700      140737337104128
 
-    Thread 2 (Thread 0x7ffff77c2700 (LWP 7787) "tls_test_01"):
-    fs_base        0x7ffff77c2700      140737345496832
+Thread 2 (Thread 0x7ffff77c2700 (LWP 7787) "tls_test_01"):
+fs_base        0x7ffff77c2700      140737345496832
 
-    Thread 1 (Thread 0x7ffff7fce740 (LWP 7676) "tls_test_01"):
-    fs_base        0x7ffff7fce740      140737353934656
+Thread 1 (Thread 0x7ffff7fce740 (LWP 7676) "tls_test_01"):
+fs_base        0x7ffff7fce740      140737353934656
+```
 
 可能很多同学有疑问，为什么要用这个奇奇怪怪的伪寄存器 `$fs_base`，GDB 的 `info register` 不是可以直接看 fs 寄存器的值吗？如果你做动手试一下就会发现，GDB 中的 fs 寄存器的值始终都是 0。
 
@@ -140,13 +148,15 @@ GDB 提供了一个 `$fs_base` 的伪寄存器来直接获取 FS 寄存器的值
 
 我们可以用 gdb 查看一下是否如此：
 
-    (gdb) info register fs_base
-    fs_base        0x7ffff77c2700      140737345496832
+```powershell
+(gdb) info register fs_base
+fs_base        0x7ffff77c2700      140737345496832
 
-    (gdb) x/16bx $fs_base-8
-    // 前 4 字节为 g_foo，后 4 字节为 g_bar
-    0x7ffff77c26f8:	0x78	0x56 	0x34	0x12 |	0x55	0x55	0x55	0x55
-    0x7ffff77c2700:	0x00	0x27	0x7c	0xf7 |	0xff	0x7f	0x00	0x00 
+(gdb) x/16bx $fs_base-8
+// 前 4 字节为 g_foo，后 4 字节为 g_bar
+0x7ffff77c26f8:	0x78	0x56 	0x34	0x12 |	0x55	0x55	0x55	0x55
+0x7ffff77c2700:	0x00	0x27	0x7c	0xf7 |	0xff	0x7f	0x00	0x00 
+```
 
 可以看到 g\_foo 和 g\_bar 确实各占 4 字节，分布在 fs 寄存器指向地址的前面 8 字节处。
 
@@ -173,7 +183,7 @@ typedef struct
 
 我们可以得到如下的内存布局图：
 
-![tls](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/00420546714a42a39e7e32422710ff16~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=3870\&h=1033\&s=311713\&e=jpg\&b=ffffff)
+![tls](image/tls.png)
 
 
 ## 重看 C 语言中 errno
@@ -182,22 +192,28 @@ typedef struct
 
 我们可以先来直观感受一下，errno 是否与 TLS 有关，使用 GDB 来检查其地址，来看一下 errno 是不是在 fs\_base 的内存附近。
 
-    (gdb) p/d (unsigned long long ) &errno - $fs_base
-    $8 = -128
+```powershell
+(gdb) p/d (unsigned long long ) &errno - $fs_base
+$8 = -128
+```
 
 这表明 errno 位于 fs\_base 指向的地址偏移量 -128 字节的位置。去看 glibc 的代码可以进一步去儿呢，errno 确实是一个被 `__thread` 修饰的线程局部变量。
 
-    extern __thread int errno attribute_tls_model_ie;
+```powershell
+extern __thread int errno attribute_tls_model_ie;
+```
 
 
 ## glibc 中 pthread\_self() 是如何实现的
 
 在 glibc 中，`pthread_self()` 函数被用来获取当前线程的 ID，其类型为 pthread\_t，类似于 Java 中 `Thread.currentThread()`。要探究 pthread\_self() 的底层实现，我们可以利用 GDB 的 disas 命令来反汇编 pthread\_self() 函数，来查看其汇编指令：
 
-    (gdb) disas pthread_self
-    Dump of assembler code for function pthread_self:
-       0x00007ffff7bbcd90 <+0>:     mov    %fs:0x10,%rax
-       0x00007ffff7bbcd99 <+9>:     retq   
+```powershell
+(gdb) disas pthread_self
+Dump of assembler code for function pthread_self:
+   0x00007ffff7bbcd90 <+0>:     mov    %fs:0x10,%rax
+   0x00007ffff7bbcd99 <+9>:     retq   
+```
 
 这段汇编代码执行了两个操作:
 

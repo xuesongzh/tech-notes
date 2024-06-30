@@ -50,7 +50,7 @@ struct list_head {
 };
 ```
 
-![wait\_queu](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/ddad59f063e5474584d26f3f72b80670~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=3791\&h=1354\&s=565678\&e=jpg\&b=ffffff)
+![wait\_queu](image/epoll.png)
 
 > 为什么 list\_head 结构体根本就没有数据属性？
 
@@ -112,13 +112,15 @@ int main() {
 
 不出意外，运行上面的代码会打印出
 
-    Data: 300
-    Data: 200
-    Data: 100
+```powershell
+Data: 300
+Data: 200
+Data: 100
+```
 
 双向链表的示例如下图所示：
 
-![intrusive-lists](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/19cbe36599e2438e8e1c558a665c4a69~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=2949\&h=741\&s=287774\&e=jpg\&b=fdfdfd)
+![intrusive-lists](image/epoll2.png)
 
 简单而言，`intrusive lists` 就是利用链表节点 `list_head` 和数据存储位置上是紧挨着的，通过链表节点的地址，可以推断出链表数据节点各个字段的地址。比如这个例子中，list\_head 组成循环链表，通过 list\_head 指针地址减去 8 就可以得到 my\_item 结构体的起始地址，进而可以获取到 data 字段的值。
 
@@ -244,7 +246,7 @@ struct eventpoll {
 *   rb\_root\_cached rbr：红黑树的根节点，用于高效地管理和查找 epoll 项（epoll 监视的文件描述符）
 *   epitem \*ovflist：溢出列表，当内核正在拷贝 ready 的 fd 到 rdllist 时，此时如果有新的 ready 的 fd，则会临时加入这个单向链表
 
-![epoll\_socket\_1](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/2e2133cb633141b1925d760037e0bf0b~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=3695\&h=1666\&s=656528\&e=jpg\&b=fdfdfd)
+![epoll\_socket\_1](image/epoll3.png)
 
 epoll 中涉及两种等待队列，一个是 epoll 本身的等待队列，一个是 socket 设备的等待队列，这两个等待队列一定要区分清楚，不然后面的内容很容易搞混。
 
@@ -290,7 +292,7 @@ SYSCALL_DEFINE4(epoll_ctl, int, epfd, int, op, int, fd,
 
 epoll 底层使用**红黑树**来跟踪所有感兴趣的 fd，比如 100 万个 socket 句柄，这棵红黑树的顶点是结构体 `struct eventpoll` 的字段 rbr。当调用 `epoll_ctl(EPOLL_CTL_ADD)` 时，就会创建一个 epitem 实例，并插入到红黑树中。
 
-![epoll\_rbtree](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/82b6a9b8660d4043b05495f3254881d0~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=1862\&h=1466\&s=270818\&e=jpg\&b=ffffff)
+![epoll\_rbtree](image/epoll4.png)
 
 红黑树存储的节点类型是 `struct epitem`，它的定义如下
 
@@ -316,7 +318,7 @@ struct epitem {
 
 `rdllink` 的类型为 list\_head，前面介绍过是用于构造双向链表，这里是将 epitem 结构体链接到双向链表中（eventpoll 结构体中的双向链表 rdllist）
 
-![epitem](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7aa21813a04b40f782c9131e6132538d~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=2991\&h=1074\&s=515005\&e=jpg\&b=fdfdfd)
+![epitem](image/epoll5.png)
 
 红黑树是一颗自平衡的二叉查找树，这样就需要节点之间能够比较大小进行排序。epitem 之间比较大小是通过比较 epitem 结构体中的 `epoll_filefd` 字段来实现的，调用的比较函数是 `ep_cmp_ffd`
 
@@ -447,7 +449,7 @@ struct eppoll_entry {
 *   调用 `init_waitqueue_func_entry` 初始化 `eppoll_entry`，设置文件发生事件时的回调函数为 `ep_poll_callback`
 *   将 `eppoll_entry` 挂在当前 socket 文件的等待队列中，当对应的 fd 有事件发生时，就会调用 `ep_poll_callback`
 
-![inline](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/60d0d91187fd465184e104b479c3801b~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=843\&h=461\&s=98996\&e=jpg\&b=f9f9f9)
+![inline](image/epoll6.png)
 
 `ep_poll_callback` 是一个 epoll 框架中非常重要的函数，它做为 epoll 的回调函数，当 socket 上有事件发生被调用。
 
@@ -543,14 +545,14 @@ fetch_events:
 
 可以用 qemu 调试 linux 内核代码来做实验，在 ep\_poll\_callback 上打一个断点，可以看到当有事件发生时（比如建立等）会触发网卡软中断，然后调用 `sock_def_readable`，然后最后调用到 ep\_poll\_callback，在 ep\_poll\_callback 函数中唤醒等待在 `ep->wq` 进程，让 epoll\_wait 而陷入休眠的进程唤醒，然后从内核拷贝就绪事件。
 
-![inline](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/4090ee5cfe9a49fcb526b4936be2f1a5~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=922\&h=1360\&s=256533\&e=jpg\&b=3b3f42)
+![inline](image/epoll7.png)
 
 这个过程如下图所示：
 
-![epoll\_socket\_wakeup](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/4c304698c13f4f11b09ffb070732c4f6~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=5133\&h=1874\&s=1007409\&e=jpg\&b=fefefe)
+![epoll\_socket\_wakeup](image/epoll8.png)
 
 ## 小结
 
 epoll 内部错综复杂的内部关系，我用一个大图呈现了出现，希望可以帮助你理解。
 
-![epoll\_all](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/6b76bc1a993040ee8dbce12496c3e064~tplv-k3u1fbpfcp-jj-mark:0:0:0:0:q75.image#?w=10608\&h=5837\&s=4133643\&e=jpg\&b=fefefe)
+![epoll\_all](image/epoll9.png)
