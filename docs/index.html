@@ -34,8 +34,16 @@
         color: 'rgb(90,90,90)',
         language: 'chinese'
       },
+      plugins: [
+        function (hook) {
+          hook.doneEach(function () {
+            MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
+          });
+        }
+      ]
     }
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-MML-AM_CHTML"></script>
   <!--代码高亮-->
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-c.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-cpp.js"></script>
