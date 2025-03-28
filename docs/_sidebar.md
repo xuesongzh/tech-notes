@@ -617,7 +617,7 @@
     * [36｜访问对象的代理对象：视图类型](编程语言/现代C++实战30讲/10.增补篇/07)
   
   * C++20
-    * [开篇词｜为什么掌握现代C++新特性如此重要](编程语言/C++20/开篇词｜为什么掌握现代C++新特性如此重要？.md）
+    * [开篇词｜为什么掌握现代C++新特性如此重要](编程语言/C++20/开篇词｜为什么掌握现代C++新特性如此重要？.md)
     * [01｜Modules（上）：C++模块化问题的前世今生](编程语言/C++20/01｜Modules（上）：C++模块化问题的前世今生.md)
     * [02｜Modules（中）：解决编译性能和符号隔离的银弹](编程语言/C++20/02｜Modules（中）：解决编译性能和符号隔离的银弹.md)
     * [03｜Modules（下）：实战写个多模块图像处理服务](编程语言/C++20/03｜Modules（下）：实战写个多模块图像处理服务.md)
@@ -902,6 +902,55 @@
     * [29｜Generator：一种无栈协程的简易实现](编程语言/手写Python虚拟机/29｜Generator：一种无栈协程的简易实现.md)
     * [结课测试｜一起挑战吧！](编程语言/手写Python虚拟机/结课测试｜一起挑战吧！.md)
     * [结束语｜结束，只是新的开始](编程语言/手写Python虚拟机/结束语｜结束，只是新的开始.md)
+
+* Android
+  * 基础框架
+    * [四大组件之Activity](Android/basic/01_activity.md)
+    * [Activity启动模式](Android/basic/Android-Activity启动模式&IntentFilter匹配规则.md)
+    * [Fragment相关知识点](Android/basic/02_fragment.md)
+    * [如何正确的使用Service](Android/basic/03_service.md)
+    * [分享一些Broadcast使用技巧](Android/basic/04_broadcast.md)
+    * [很少有人知道的ContentProvider使用技巧](Android/basic/05_content_provider.md)
+    * [屏幕适配最佳实践](Android/basic/06_multiple_screen_support.md)
+    * [最通俗易懂的Handler源码解析](Android/basic/07_handler.md)
+    * [Activity的Task亲和关系](Android/basic/08_task_affinity.md)
+    * [Android签名机制v1、v2、v3](Android/basic/09_signature.md)
+    * [Android反编译指南](Android/basic/Android-反编译指南.md)
+    * [Android-屏幕适配全攻略](Android/basic/Android-屏幕适配全攻略.md)
+    * [Android性能优化-UI优化](Android/basic/Android-性能优化-UI优化.md)
+    * [Android性能优化-内存优化](Android/basic/Android-性能优化-内存优化.md)
+    * [揭秘Android系统启动过程](Android/framework/01_system_start.md)
+    * [深入理解init与zygote进程](Android/framework/02_init_zygote.md)
+    * [探索SystemServer进程创建过程](Android/framework/03_system_server_01.md)
+    * [原来SystemServer启动时干了这么多](Android/framework/04_system_server_02.md)
+    * [Android Binder进程间通讯](Android/framework/Android-Binder进程间通讯.md)
+    * [Android-Handler消息机制](Android/framework/Android-Handler消息机制.md)
+    * [Android-IPC多进程](Android/framework/Android-IPC多进程.md)
+    * [Android系统启动时都干了什么](Android/framework/Android-系统启动过程.md)
+    * [Android从点击应用图标到界面显示的过程](Android/framework/Android-Activity启动过程.md)
+    * [Activity与Window与View之间的关系](Android/framework/Android-Activity与Window与View之间的关系.md)
+    * [Android图形系统Surface与SurfaceFlinger之间的关系](Android/framework/Android-SurfaceFlinger图形系统.md)
+    * [Android Service启动过程](Android/framework/Android-Service启动过程.md)
+    * [Android PackageManagerService工作流程](Android/framework/Android-PackageManagerService分析.md)
+    * [Android PowerManagerService启动过程](Android/framework/Android-PowerManagerService-启动.md)
+    * [Android PowerManagerService WakeLock 机制](Android/framework/Android-PowerManagerService-WakeLock.md)
+    * [Android PowerManagerService 亮屏过程](Android/framework/Android-PowerManagerService-亮屏.md)
+    * [Android PowerManagerService 灭屏过程](Android/framework/Android-PowerManagerService-灭屏.md)
+  
+  * 性能优化
+    * [（一）渲染性能优化](Android/performance/01_render.md)
+    * [（二）计算性能优化](Android/performance/02_compute.md)
+    * [（三）内存性能优化](Android/performance/03_memory.md)
+    * [（四）电量性能优化](Android/performance/04_battery.md)
+    * [（五）网络性能优化](Android/performance/05_network.md)
+    * [（六）启动性能优化](Android/performance/06_launch.md)
+    * [（七）APK 体积优化](Android/performance/07_apk.md)
+    
+  * 热修复与插件化系列
+    * [聊聊反射](Android/plugin/01_reflection.md)
+    * [不得不学之代理模式](Android/plugin/02_proxy.md)
+    * [Hook 初探](Android/plugin/03_hook.md)
+    * [Hook 实战之 Hook AMS](Android/plugin/04_hook_ams.md)
 
 * 人工智能
   
