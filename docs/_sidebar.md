@@ -936,6 +936,7 @@
     * [Android PowerManagerService WakeLock 机制](Android/framework/Android-PowerManagerService-WakeLock.md)
     * [Android PowerManagerService 亮屏过程](Android/framework/Android-PowerManagerService-亮屏.md)
     * [Android PowerManagerService 灭屏过程](Android/framework/Android-PowerManagerService-灭屏.md)
+    * [Android开发艺术探索](Android/framework/Android开发艺术探索.md)
   
   * 性能优化
     * [（一）渲染性能优化](Android/performance/01_render.md)
