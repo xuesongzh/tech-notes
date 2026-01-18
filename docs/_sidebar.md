@@ -958,6 +958,7 @@
     * [Hook 实战之 Hook AMS](Android/plugin/04_hook_ams.md)
 
 * 人工智能
+  * LLM智能应用开发
   
  
 
