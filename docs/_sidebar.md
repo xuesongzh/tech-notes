@@ -959,7 +959,21 @@
 
 * 人工智能
   * LLM智能应用开发
-  
- 
+    * [1.课程简介](人工智能/llm-course-lecture/2025/lecture1.md)
+    * [2.特征空间的变换1: 前反向运行视角理解深度学习模型](人工智能/llm-course-lecture/2025/lecture2.md)
+    * [3.特征空间的变换2: 前反向运行视角理解深度学习模型](人工智能/llm-course-lecture/2025/lecture3.md)
+    * [4.大语言模型解析 I: Input/Positional Embedding](人工智能/llm-course-lecture/2025/lecture4.md)
+    * [5.大语言模型解析 II: RMSNorm/FFN](人工智能/llm-course-lecture/2025/lecture5.md)
+    * [6.大语言模型解析 III: Attention Mechanism I](人工智能/llm-course-lecture/2025/lecture6.md)
+    * [7.大语言模型解析 IV: Attention Mechanism II](人工智能/llm-course-lecture/2025/lecture7.md)
+    * [8.大语言模型解析 V: Attention Mechanism III](人工智能/llm-course-lecture/2025/lecture8.md)
+    * [9.大语言模型解析 VI: 数据，模型运行，代码](人工智能/llm-course-lecture/2025/lecture9.md)
+    * [10.大语言模型解析 VII: 模型训练二三事](人工智能/llm-course-lecture/2025/lecture10.md)
+    * [11.大语言模型解析 VIII: 模型推理二三事](人工智能/llm-course-lecture/2025/lecture11.md)
+    * [12.大语言模型解析 IX: Sparse Attention](人工智能/llm-course-lecture/2025/lecture12.md)
+    * [13.大语言模型推理应用: 检索增强生成](人工智能/llm-course-lecture/2025/lecture13.md)
+    * [14.大语言模型推理应用: 检索增强生成II](人工智能/llm-course-lecture/2025/lecture14.md)
+    * [15.大语言模型进阶: Megatron中运用的并行化技术介绍](人工智能/llm-course-lecture/2025/lecture15.md)
+    
 
     
